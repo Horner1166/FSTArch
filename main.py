@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from app.api import auth_routes
-from app.db import init_db
+from api import auth_routes
+from db import init_db
 from fastapi.openapi.utils import get_openapi
 app = FastAPI(title="FastAPI Email Auth Example")
 

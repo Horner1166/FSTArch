@@ -5,11 +5,11 @@ from typing import Optional
 from datetime import datetime, timedelta
 from fastapi import HTTPException, BackgroundTasks
 from sqlmodel import Session, select
-from app.core.config import settings
-from app.core.email_utils import send_email
-from app.core.security import decode_token
-from app.db import engine
-from app.models.models import VerificationCode, User
+from core.config import settings
+from core.email_utils import send_email
+from core.security import decode_token
+from db import engine
+from models.models import VerificationCode, User
 
 def generate_code(length: int = 6) -> str:
     return ''.join(secrets.choice(string.digits) for _ in range(length))

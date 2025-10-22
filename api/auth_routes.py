@@ -2,11 +2,11 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlmodel import Session, select
 from datetime import datetime
 
-from app.api.utils import get_user_by_email, create_and_send_code
-from app.core.security import create_access_token
-from app.db import engine
-from app.models.models import VerificationCode, User
-from app.schemas.auth import RequestCodeSchema, ConfirmCodeSchema, LoginCodeVerifySchema
+from api.utils import get_user_by_email, create_and_send_code
+from core.security import create_access_token
+from db import engine
+from models.models import VerificationCode, User
+from schemas.auth import RequestCodeSchema, ConfirmCodeSchema, LoginCodeVerifySchema
 
 router = APIRouter()
 
