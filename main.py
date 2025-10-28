@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from api import auth_routes
 from db import init_db
 from fastapi.openapi.utils import get_openapi
+from core.cleanup import start_cleanup_thread
 app = FastAPI(title="FastAPI Email Auth Example")
 
 app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
@@ -9,6 +10,7 @@ app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
 @app.on_event("startup")
 def startup():
     init_db()
+    start_cleanup_thread()
 
 def custom_openapi():
     if app.openapi_schema:
