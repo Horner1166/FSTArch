@@ -13,15 +13,13 @@ router = APIRouter()
 def request_code(data: RequestCodeSchema, background_tasks: BackgroundTasks):
         user = get_user_by_email(session, data.email)
         if user:
-            purpose = "login_code"
             subject = "Код для входа"
             body = "Ваш код для входа: {code}."
         else:
-            purpose = "registration"
             subject = "Код для регистрации"
             body = "Ваш код для регистрации: {code}."
 
-        create_and_send_code(background_tasks,session,data.email,purpose,subject,body)
+        create_and_send_code(background_tasks,session,data.email,subject,body)
         return {"msg": f"Код для {'входа' if user else 'регистрации'} отправлен на email"}
 
 @router.post("/authorize")

@@ -14,8 +14,8 @@ from models.models import VerificationCode, User
 def generate_code(length: int = 6) -> str:
     return ''.join(secrets.choice(string.digits) for _ in range(length))
 
-def code_rate_limited(session: Session, email: str, purpose: str) -> Optional[int]:
-    stmt = select(VerificationCode).where(VerificationCode.email == email, VerificationCode.purpose == purpose).order_by(VerificationCode.created_at.desc()).limit(1)
+def code_rate_limited(session: Session, email: str) -> Optional[int]:
+    stmt = select(VerificationCode).where(VerificationCode.email == email).order_by(VerificationCode.created_at.desc()).limit(1)
     last = session.exec(stmt).first()
     if last:
         delta = (datetime.now() - last.created_at).total_seconds()
@@ -23,13 +23,13 @@ def code_rate_limited(session: Session, email: str, purpose: str) -> Optional[in
             return int(settings.CODE_RATE_LIMIT_SECONDS - delta)
     return None
 
-def create_and_send_code(background_tasks: BackgroundTasks, session: Session, email: str, purpose: str, subject: str, body_template: str):
-    remaining = code_rate_limited(session, email, purpose)
+def create_and_send_code(background_tasks: BackgroundTasks, session: Session, email: str, subject: str, body_template: str):
+    remaining = code_rate_limited(session, email)
     if remaining is not None:
         raise HTTPException(status_code=429, detail=f"Запрос ограничен. Попробуйте через {remaining} секунд")
     code = generate_code()
     expires = datetime.now() + timedelta(minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES)
-    vc = VerificationCode(email=email, purpose=purpose, code=code, expires_at=expires)
+    vc = VerificationCode(email=email, code=code, expires_at=expires)
     session.add(vc)
     session.commit()
     body = body_template.format(code=code, expires=expires.isoformat())

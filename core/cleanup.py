@@ -16,7 +16,7 @@ def cleanup_verification_codes():
         except Exception as e:
             print(f"⚠️ Ошибка при очистке кодов: {e}")
 
-        time.sleep(100)
+        time.sleep(900)
 
 def start_cleanup_thread():
     thread = threading.Thread(target=cleanup_verification_codes, daemon=True)

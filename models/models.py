@@ -11,7 +11,6 @@ class User(SQLModel, table=True):
 class VerificationCode(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(index=True)
-    purpose: str
     code: str
     created_at: datetime = Field(default_factory=datetime.now)
     expires_at: datetime
