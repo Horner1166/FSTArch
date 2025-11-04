@@ -1,37 +1,20 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
-from api import auth_routes
+from api import auth_routes, post_routes, admin_routes
 from db import init_db
-from fastapi.openapi.utils import get_openapi
 from core.cleanup import start_cleanup_thread
-app = FastAPI(title="FastAPI Email Auth Example")
 
-app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
-
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
     start_cleanup_thread()
+    yield
+app = FastAPI(title="Авторизация", description="Авторизация по email", version="0.1", lifespan=lifespan)
 
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    openapi_schema = get_openapi(
-        title="Авторизация",
-        version="0.1",
-        description="",
-        routes=app.routes,
-    )
-    openapi_schema["components"]["securitySchemes"] = {
-        "Авторизация": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT"
-        }
-    }
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-app.openapi = custom_openapi
+app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
+app.include_router(post_routes.router, prefix="/posts", tags=["Posts"])
+#app.include_router(admin_routes.router, prefix="/admin", tags=["Admin"])
 
 if __name__ == "__main__":
     import uvicorn

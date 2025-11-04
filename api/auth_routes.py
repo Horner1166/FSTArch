@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from datetime import datetime
 from api.utils import get_user_by_email, create_and_send_code, generate_code
 from core.security import create_access_token
-from models.models import VerificationCode, User
+from models.models import User, VerificationCode
 from schemas.auth import RequestCodeSchema, ConfirmCodeSchema, LoginCodeVerifySchema
 from db import session
 
