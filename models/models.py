@@ -28,6 +28,7 @@ class Post(SQLModel, table=True):
     content: str = Field(nullable=False)
     created_at: datetime = Field(default_factory=datetime.now)
     user_id: int = Field(foreign_key="user.id")
+    user_email: str = Field(index=True)
     user: Optional["User"] = Relationship(back_populates="posts")
 
 

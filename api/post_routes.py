@@ -13,7 +13,8 @@ def create_post(post_data: PostCreate, current_user: User = Depends(get_current_
     post = Post(
         title=post_data.title,
         content=post_data.content,
-        user_id=current_user.id
+        user_id=current_user.id,
+        user_email = current_user.email
     )
     session.add(post)
     session.commit()
