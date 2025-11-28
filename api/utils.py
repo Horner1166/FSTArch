@@ -3,7 +3,7 @@ import string
 
 from typing import Optional
 from datetime import datetime, timedelta
-from fastapi import HTTPException, BackgroundTasks, Depends, Header, Security
+from fastapi import HTTPException, BackgroundTasks, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel import Session, select
 from core.config import settings
@@ -13,6 +13,7 @@ from db import engine
 from models.models import VerificationCode, User, UserRole
 
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 def generate_code(length: int = 6) -> str:
     return ''.join(secrets.choice(string.digits) for _ in range(length))
@@ -53,6 +54,22 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         if not user:
             raise HTTPException(status_code=401, detail="Пользователь не найден")
         return user
+
+def get_optional_user(credentials: Optional[HTTPAuthorizationCredentials] = Security(optional_security)) -> Optional[User]:
+    """Получить пользователя, если он авторизован, иначе вернуть None"""
+    if not credentials:
+        return None
+    try:
+        token = credentials.credentials
+        payload = decode_token(token)
+        if not payload or "sub" not in payload:
+            return None
+        email = payload["sub"]
+        with Session(engine) as db_session:
+            user = get_user_by_email(db_session, email)
+            return user
+    except:
+        return None
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role != UserRole.ADMIN:

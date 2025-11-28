@@ -6,7 +6,3 @@ class RequestCodeSchema(BaseModel):
 class ConfirmCodeSchema(BaseModel):
     email: EmailStr
     code: str
-
-class LoginCodeVerifySchema(BaseModel):
-    email: EmailStr
-    code: str

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select
-from typing import List
-from api.utils import get_current_user
-from models.models import User, UserRole, Post
+from typing import List, Optional
+from api.utils import get_current_user, get_optional_user
+from models.models import User, UserRole, Post, ModerationStatus
 from schemas.post import PostCreate, PostUpdate, PostResponse
 from db import get_session
 
@@ -10,6 +10,7 @@ router = APIRouter()
 
 @router.post("/create_post", response_model=PostResponse, status_code=201)
 def create_post(post_data: PostCreate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Создать пост"""
     post = Post(
         title=post_data.title,
         content=post_data.content,
@@ -23,19 +24,32 @@ def create_post(post_data: PostCreate, current_user: User = Depends(get_current_
 
 @router.get("/get_all", response_model=List[PostResponse])
 def get_all_posts(session: Session = Depends(get_session)):
-    stmt = select(Post).order_by(Post.created_at.desc())
+    """Получить все одобренные посты"""
+    stmt = select(Post).where(Post.moderation_status == ModerationStatus.APPROVED).order_by(Post.created_at.desc())
     posts = session.exec(stmt).all()
     return posts
 
 @router.get("/get_post_{post_id}", response_model=PostResponse)
-def get_post(post_id: int, session: Session = Depends(get_session)):
+def get_post(post_id: int, current_user: Optional[User] = Depends(get_optional_user), session: Session = Depends(get_session)):
+    """Получить пост по ID"""
     post = session.get(Post, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Пост не найден")
+    
+    if current_user and current_user.role == UserRole.ADMIN:
+        return post
+    
+    if current_user and post.user_id == current_user.id:
+        return post
+    
+    if post.moderation_status != ModerationStatus.APPROVED:
+        raise HTTPException(status_code=404, detail="Пост не найден")
+    
     return post
 
 @router.put("/update_post_{post_id}", response_model=PostResponse)
 def update_post(post_id: int, post_data: PostUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Редактировать пост по ID"""
     post = session.get(Post, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Пост не найден")
@@ -55,6 +69,7 @@ def update_post(post_id: int, post_data: PostUpdate, current_user: User = Depend
 
 @router.delete("/delete_post_{post_id}", status_code=204)
 def delete_post(post_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Удалить пост по ID"""
     post = session.get(Post, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Пост не найден")
@@ -67,8 +82,17 @@ def delete_post(post_id: int, current_user: User = Depends(get_current_user), se
     return None
 
 @router.get("/get_posts_{user_id}", response_model=List[PostResponse])
-def get_user_posts(user_id: int, session: Session = Depends(get_session)):
-    stmt = select(Post).where(Post.user_id == user_id).order_by(Post.created_at.desc())
+def get_user_posts(user_id: int, current_user: Optional[User] = Depends(get_optional_user), session: Session = Depends(get_session)):
+    """Получить одобренные посты пользователя"""
+    if current_user and current_user.role == UserRole.ADMIN:
+        stmt = select(Post).where(Post.user_id == user_id).order_by(Post.created_at.desc())
+    elif current_user and current_user.id == user_id:
+        stmt = select(Post).where(Post.user_id == user_id).order_by(Post.created_at.desc())
+    else:
+        stmt = select(Post).where(
+            Post.user_id == user_id,
+            Post.moderation_status == ModerationStatus.APPROVED
+        ).order_by(Post.created_at.desc())
+    
     posts = session.exec(stmt).all()
     return posts
-

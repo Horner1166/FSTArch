@@ -7,6 +7,11 @@ class UserRole(str, Enum):
     GUEST = "guest"
     ADMIN = "admin"
 
+class ModerationStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(index=True, nullable=False, unique=True)
@@ -29,6 +34,5 @@ class Post(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     user_id: int = Field(foreign_key="user.id")
     user_email: str = Field(index=True)
+    moderation_status: ModerationStatus = Field(default=ModerationStatus.PENDING, index=True)
     user: Optional["User"] = Relationship(back_populates="posts")
-
-

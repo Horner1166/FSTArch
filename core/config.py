@@ -1,6 +1,3 @@
-import os
-
-from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -16,5 +13,7 @@ class Settings(BaseSettings):
     SMTP_EMAIL: str = "doorkaauthorize@gmail.com"
     SMTP_PASSWORD: str = "htnr gqvv mfec yusb"
     FROM_EMAIL: str = "authorize@gmail.com"
+    
+    ADMIN_EMAIL: str = "romka11666@gmail.com"
 
 settings = Settings()

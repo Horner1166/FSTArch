@@ -10,11 +10,11 @@ async def lifespan(app: FastAPI):
     init_db()
     start_cleanup_thread()
     yield
-app = FastAPI(title="Авторизация", description="Авторизация по email", version="0.1", lifespan=lifespan)
+app = FastAPI(title="Гойда", description="Авторизация по email", version="0.3", lifespan=lifespan)
 
 app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
 app.include_router(post_routes.router, prefix="/posts", tags=["Posts"])
-#app.include_router(admin_routes.router, prefix="/admin", tags=["Admin"])
+app.include_router(admin_routes.router, prefix="/admin", tags=["Admin"])
 
 if __name__ == "__main__":
     import uvicorn
