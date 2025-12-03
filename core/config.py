@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = "htnr gqvv mfec yusb"
     FROM_EMAIL: str = "authorize@gmail.com"
     
+    ADMIN_USERNAME: str = "Идиот"
     ADMIN_EMAIL: str = "romka11666@gmail.com"
 
 settings = Settings()

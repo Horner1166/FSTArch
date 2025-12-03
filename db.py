@@ -8,11 +8,11 @@ engine = create_engine(DB_URL, connect_args={"check_same_thread": False} if DB_U
 session = Session(autocommit=False, autoflush=False, bind=engine)
 
 def create_admin_user():
-    """Создает администратора при запуске приложения, если его еще нет"""
     with Session(engine) as session:
         admin = session.exec(select(User).where(User.email == settings.ADMIN_EMAIL)).first()
         if not admin:
             admin = User(
+                username=settings.ADMIN_USERNAME,
                 email=settings.ADMIN_EMAIL,
                 role=UserRole.ADMIN,
                 is_active=True

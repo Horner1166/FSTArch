@@ -4,7 +4,8 @@ from datetime import datetime
 from enum import Enum
 
 class UserRole(str, Enum):
-    GUEST = "guest"
+    USER = "user"
+    MODERATOR = "moderator"
     ADMIN = "admin"
 
 class ModerationStatus(str, Enum):
@@ -15,8 +16,10 @@ class ModerationStatus(str, Enum):
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(index=True, nullable=False, unique=True)
+    username: str = Field(index=True, nullable=False, unique=True)
     is_active: bool = True
-    role: UserRole = Field(default=UserRole.GUEST)
+    is_banned: bool = Field(default=False, index=True)
+    role: UserRole = Field(default=UserRole.USER)
     created_at: datetime = Field(default_factory=datetime.now)
     posts: list["Post"] = Relationship(back_populates="user")
 

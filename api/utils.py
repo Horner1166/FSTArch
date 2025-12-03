@@ -1,5 +1,6 @@
 import secrets
 import string
+import random
 
 from typing import Optional
 from datetime import datetime, timedelta
@@ -56,7 +57,6 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         return user
 
 def get_optional_user(credentials: Optional[HTTPAuthorizationCredentials] = Security(optional_security)) -> Optional[User]:
-    """Получить пользователя, если он авторизован, иначе вернуть None"""
     if not credentials:
         return None
     try:
@@ -75,3 +75,17 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Недостаточно прав доступа")
     return current_user
+
+def require_moderator(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != UserRole.MODERATOR:
+        raise HTTPException(status_code=403, detail="Недостаточно прав доступа")
+    return current_user
+
+def generate_unique_username(session: Session) -> str:
+    """Генерирует уникальный ник вида user{случайное_число}"""
+    while True:
+        random_number = random.randint(100000000, 999999999)
+        username = f"user{random_number}"
+        existing_user = session.exec(select(User).where(User.username == username)).first()
+        if not existing_user:
+            return username

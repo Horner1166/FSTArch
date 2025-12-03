@@ -11,6 +11,9 @@ router = APIRouter()
 @router.post("/create_post", response_model=PostResponse, status_code=201)
 def create_post(post_data: PostCreate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Создать пост"""
+    if current_user.is_banned:
+        raise HTTPException(status_code=403, detail="Вы забанены и не можете создавать посты")
+    
     post = Post(
         title=post_data.title,
         content=post_data.content,
@@ -83,7 +86,7 @@ def delete_post(post_id: int, current_user: User = Depends(get_current_user), se
 
 @router.get("/get_posts_{user_id}", response_model=List[PostResponse])
 def get_user_posts(user_id: int, current_user: Optional[User] = Depends(get_optional_user), session: Session = Depends(get_session)):
-    """Получить одобренные посты пользователя"""
+    """Получить посты пользователя"""
     if current_user and current_user.role == UserRole.ADMIN:
         stmt = select(Post).where(Post.user_id == user_id).order_by(Post.created_at.desc())
     elif current_user and current_user.id == user_id:

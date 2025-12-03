@@ -6,3 +6,6 @@ class RequestCodeSchema(BaseModel):
 class ConfirmCodeSchema(BaseModel):
     email: EmailStr
     code: str
+
+class UpdateUsernameSchema(BaseModel):
+    username: str
