@@ -82,7 +82,6 @@ def require_moderator(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 def generate_unique_username(session: Session) -> str:
-    """Генерирует уникальный ник вида user{случайное_число}"""
     while True:
         random_number = random.randint(100000000, 999999999)
         username = f"user{random_number}"

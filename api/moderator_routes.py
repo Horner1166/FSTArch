@@ -90,12 +90,7 @@ def ban_user(user_id: int, current_user: User = Depends(get_current_user), sessi
     session.commit()
     session.refresh(user)
     
-    return {
-        "msg": f"Пользователь {user.username} забанен. Удалено постов: {len(user_posts)}",
-        "username": user.username,
-        "user_id": user.id,
-        "email": user.email,
-    }
+    return {"msg": f"Пользователь {user.username} забанен. Удалено постов: {len(user_posts)}","username": user.username,"user_id": user.id,"email": user.email,}
 
 
 @router.post("/users/{user_id}/unban")
@@ -113,16 +108,10 @@ def unban_user(user_id: int, current_user: User = Depends(get_current_user), ses
     
     if not user.is_banned:
         raise HTTPException(status_code=400, detail="Пользователь не забанен")
-    
-    # Разбаниваем пользователя
+
     user.is_banned = False
     session.add(user)
     session.commit()
     session.refresh(user)
     
-    return {
-        "msg": f"Пользователь {user.username} разбанен",
-        "username": user.username,
-        "user_id": user.id,
-        "email": user.email,
-    }
+    return {"msg": f"Пользователь {user.username} разбанен","username": user.username,"user_id": user.id,"email": user.email,}

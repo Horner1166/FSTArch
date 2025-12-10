@@ -9,17 +9,29 @@ session = Session(autocommit=False, autoflush=False, bind=engine)
 
 def create_admin_user():
     with Session(engine) as session:
-        admin = session.exec(select(User).where(User.email == settings.ADMIN_EMAIL)).first()
-        if not admin:
-            admin = User(
+        admin1 = session.exec(select(User).where(User.email == settings.ADMIN_EMAIL)).first()
+        if not admin1:
+            admin1 = User(
                 username=settings.ADMIN_USERNAME,
                 email=settings.ADMIN_EMAIL,
                 role=UserRole.ADMIN,
                 is_active=True
             )
-            session.add(admin)
+            session.add(admin1)
             session.commit()
             print(f"Администратор создан: {settings.ADMIN_EMAIL}")
+
+        admin2 = session.exec(select(User).where(User.email == settings.ADMIN2_EMAIL)).first()
+        if not admin2:
+            admin2 = User(
+                username=settings.ADMIN2_USERNAME,
+                email=settings.ADMIN2_EMAIL,
+                role=UserRole.ADMIN,
+                is_active=True
+            )
+            session.add(admin2)
+            session.commit()
+            print(f"Администратор создан: {settings.ADMIN2_EMAIL}")
 
 def init_db():
     SQLModel.metadata.create_all(engine)
