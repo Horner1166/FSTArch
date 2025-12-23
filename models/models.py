@@ -21,6 +21,7 @@ class User(SQLModel, table=True):
     is_banned: bool = Field(default=False, index=True)
     role: UserRole = Field(default=UserRole.USER)
     created_at: datetime = Field(default_factory=datetime.now)
+    last_username_change_at: Optional[datetime] = Field(default=None)
     posts: list["Post"] = Relationship(back_populates="user")
 
 class VerificationCode(SQLModel, table=True):

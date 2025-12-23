@@ -8,7 +8,7 @@ from db import get_session
 
 router = APIRouter()
 
-@router.post("/create_post", response_model=PostResponse, status_code=201)
+@router.post("/[.post]", response_model=PostResponse, status_code=201)
 def create_post(post_data: PostCreate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Создать пост"""
     if current_user.is_banned:
@@ -25,14 +25,14 @@ def create_post(post_data: PostCreate, current_user: User = Depends(get_current_
     session.refresh(post)
     return post
 
-@router.get("/get_all", response_model=List[PostResponse])
+@router.get("/[.get]", response_model=List[PostResponse])
 def get_all_posts(session: Session = Depends(get_session)):
     """Получить все одобренные посты"""
     stmt = select(Post).where(Post.moderation_status == ModerationStatus.APPROVED).order_by(Post.created_at.desc())
     posts = session.exec(stmt).all()
     return posts
 
-@router.get("/get_post_{post_id}", response_model=PostResponse)
+@router.get("/:id/[.get]", response_model=PostResponse)
 def get_post(post_id: int, current_user: Optional[User] = Depends(get_optional_user), session: Session = Depends(get_session)):
     """Получить пост по ID"""
     post = session.get(Post, post_id)
@@ -50,7 +50,7 @@ def get_post(post_id: int, current_user: Optional[User] = Depends(get_optional_u
     
     return post
 
-@router.put("/update_post_{post_id}", response_model=PostResponse)
+@router.put("/:id/[.put]", response_model=PostResponse)
 def update_post(post_id: int, post_data: PostUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Редактировать пост по ID"""
     post = session.get(Post, post_id)
@@ -70,7 +70,7 @@ def update_post(post_id: int, post_data: PostUpdate, current_user: User = Depend
     session.refresh(post)
     return post
 
-@router.delete("/delete_post_{post_id}", status_code=204)
+@router.delete("/:id/[.delete]", status_code=204)
 def delete_post(post_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Удалить пост по ID"""
     post = session.get(Post, post_id)
@@ -84,7 +84,7 @@ def delete_post(post_id: int, current_user: User = Depends(get_current_user), se
     session.commit()
     return None
 
-@router.get("/get_posts_{user_id}", response_model=List[PostResponse])
+@router.get("/:user_id/[.get]", response_model=List[PostResponse])
 def get_user_posts(user_id: int, current_user: Optional[User] = Depends(get_optional_user), session: Session = Depends(get_session)):
     """Получить посты пользователя"""
     if current_user and current_user.role == UserRole.ADMIN:

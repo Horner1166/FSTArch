@@ -10,7 +10,7 @@ from db import get_session
 router = APIRouter()
 
 
-@router.get("/posts/pending", response_model=List[PostResponse])
+@router.get("/posts/[.get]", response_model=List[PostResponse])
 def get_pending_posts(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Получить все непромодерированные посты"""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
@@ -21,7 +21,7 @@ def get_pending_posts(current_user: User = Depends(get_current_user), session: S
     return posts
 
 
-@router.post("/posts/{post_id}/approve", response_model=PostResponse)
+@router.post("/posts/:id/[.post]", response_model=PostResponse)
 def approve_post(post_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Одобрить и опубликовать пост"""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
@@ -39,7 +39,7 @@ def approve_post(post_id: int, current_user: User = Depends(get_current_user), s
     return post
 
 
-@router.post("/posts/{post_id}/reject")
+@router.delete("/posts/:id/[.delete]")
 def reject_post(post_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Отклонить и удалить пост"""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
@@ -55,7 +55,7 @@ def reject_post(post_id: int, current_user: User = Depends(get_current_user), se
     return {"msg": f"Пост №{post_id} отклонен и удален"}
 
 
-@router.get("/users")
+@router.get("/users/[.get]")
 def list_users(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Получить список всех пользователей"""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
@@ -65,7 +65,7 @@ def list_users(current_user: User = Depends(get_current_user), session: Session 
     return [{"id": user.id, "username": user.username, "email": user.email, "role": user.role, "created_at": user.created_at} for user in users]
 
 
-@router.post("/users/{user_id}/ban")
+@router.post("/users/:id/ban/[.post]")
 def ban_user(user_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Забанить пользователя и удалить все его посты."""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
@@ -93,7 +93,7 @@ def ban_user(user_id: int, current_user: User = Depends(get_current_user), sessi
     return {"msg": f"Пользователь {user.username} забанен. Удалено постов: {len(user_posts)}","username": user.username,"user_id": user.id,"email": user.email,}
 
 
-@router.post("/users/{user_id}/unban")
+@router.post("/users/:id/unban/[.post]")
 def unban_user(user_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Разбанить пользователя."""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
