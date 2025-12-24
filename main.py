@@ -17,9 +17,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Progr",
-    description="Авторизация по email",
-    version="0.3",
+    title="DN",
+    description="",
+    version="0.4",
     lifespan=lifespan,
 )
 

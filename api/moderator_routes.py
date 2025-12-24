@@ -65,9 +65,9 @@ def list_users(current_user: User = Depends(get_current_user), session: Session 
     return [{"id": user.id, "username": user.username, "email": user.email, "role": user.role, "created_at": user.created_at} for user in users]
 
 
-@router.post("/users/:id/ban/[.post]")
-def ban_user(user_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
-    """Забанить пользователя и удалить все его посты."""
+@router.post("/users/:id/[.post]")
+def change_ban_status(user_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Разбанить пользователя или забанить и удалить все его посты."""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
         raise HTTPException(status_code=403, detail="Недостаточно прав доступа")
 
@@ -78,40 +78,21 @@ def ban_user(user_id: int, current_user: User = Depends(get_current_user), sessi
     if user.role != UserRole.USER:
         raise HTTPException(status_code=400, detail="Можно банить только пользователей")
 
-    if user.is_banned:
-        raise HTTPException(status_code=400, detail="Пользователь уже забанен")
+    if user.role != UserRole.USER:
+        raise HTTPException(status_code=400, detail="Можно разбанивать только пользователей")
 
     user_posts = session.exec(select(Post).where(Post.user_id == user_id)).all()
     for post in user_posts:
         session.delete(post)
 
-    user.is_banned = True
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    
-    return {"msg": f"Пользователь {user.username} забанен. Удалено постов: {len(user_posts)}","username": user.username,"user_id": user.id,"email": user.email,}
-
-
-@router.post("/users/:id/unban/[.post]")
-def unban_user(user_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
-    """Разбанить пользователя."""
-    if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
-        raise HTTPException(status_code=403, detail="Недостаточно прав доступа")
-
-    user = session.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-    
-    if user.role != UserRole.USER:
-        raise HTTPException(status_code=400, detail="Можно разбанивать только пользователей")
-    
     if not user.is_banned:
-        raise HTTPException(status_code=400, detail="Пользователь не забанен")
+        user.is_banned = True
 
-    user.is_banned = False
+    elif user.is_banned:
+        user.is_banned = False
+
     session.add(user)
     session.commit()
     session.refresh(user)
-    
-    return {"msg": f"Пользователь {user.username} разбанен","username": user.username,"user_id": user.id,"email": user.email,}
+
+    return {"msg": f"Пользователь {user.username} {'забанен' if user.is_banned == True else 'разбанен'}.","username": user.username,"user_id": user.id,"email": user.email,}
