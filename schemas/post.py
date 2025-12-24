@@ -6,18 +6,20 @@ from models.models import ModerationStatus
 class PostCreate(BaseModel):
     title: str
     content: str
-
+    contact: str
 class PostUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
+    title: str
+    content: str
+    contact: str
 
 class PostResponse(BaseModel):
     id: int
     title: str
     content: str
+    contact: str
     created_at: datetime
     user_id: int
-    user_email: str
+    username: str
     moderation_status: ModerationStatus
     
     class Config:

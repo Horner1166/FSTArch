@@ -59,13 +59,28 @@ function showToast(message, type = "info") {
   toast.textContent = message;
   toastContainer.appendChild(toast);
 
-  // Автоматическое скрытие
+  // Автоматическое скрытие через 3 секунды
   setTimeout(function () {
-    toast.classList.add("toast-hide");
-    toast.addEventListener("transitionend", function () {
-      toast.remove();
-    });
-  }, 3000);
+    if (toast && toast.parentNode) {
+      toast.classList.add("toast-hide");
+      
+      // Удаляем элемент после завершения анимации скрытия
+      const removeToast = function() {
+        if (toast && toast.parentNode) {
+          toast.remove();
+        }
+      };
+      
+      toast.addEventListener("transitionend", removeToast, { once: true });
+      
+      // Fallback: удаляем элемент через 500мс, если transitionend не сработал
+      setTimeout(function() {
+        if (toast && toast.parentNode) {
+          toast.remove();
+        }
+      }, 300);
+    }
+  }, 2000);
 }
 
 // Установить заголовок вкладки

@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from datetime import datetime, timedelta
 from api.utils import get_user_by_email, create_and_send_code, generate_unique_username, get_current_user
 from core.security import create_access_token
-from models.models import User, VerificationCode
+from models.models import User, VerificationCode, Post
 from schemas.auth import RequestCodeSchema, ConfirmCodeSchema, UpdateUsernameSchema
 from db import session, get_session
 
@@ -80,6 +80,13 @@ def update_username(data: UpdateUsernameSchema, current_user: User = Depends(get
     user.username = username
     user.last_username_change_at = now
     session.add(user)
+    
+    # Обновляем ник во всех постах пользователя
+    user_posts = session.exec(select(Post).where(Post.user_id == user.id)).all()
+    for post in user_posts:
+        post.username = username
+        session.add(post)
+    
     session.commit()
     session.refresh(user)
 

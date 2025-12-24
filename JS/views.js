@@ -40,7 +40,7 @@ async function homeView() {
       Components.el(
         "h1",
         { className: "hero-title" },
-        "Институские объявления"
+        "Объявления института"
       ),
       Components.el(
         "p",
@@ -193,6 +193,19 @@ async function homeView() {
       post.content || ""
     );
 
+    const contact = Components.el("div", { className: "modal-contact" }, [
+      Components.el(
+        "span",
+        { className: "modal-contact-label" },
+        "Контакты: "
+      ),
+      Components.el(
+        "span",
+        { className: "modal-contact-value" },
+        post.contact || "не указаны"
+      )
+    ]);
+
     const closeBtn = Components.button({
       label: "Закрыть",
       variant: "secondary",
@@ -204,6 +217,7 @@ async function homeView() {
 
     modal.appendChild(title);
     modal.appendChild(content);
+    modal.appendChild(contact);
     modal.appendChild(closeBtn);
     overlay.appendChild(modal);
 
@@ -680,13 +694,19 @@ async function postFormView(params) {
   const titleField = Components.inputField({
     label: "Заголовок",
     name: "title",
-    placeholder: "Например: Сдам комнату рядом с кампусом"
+    placeholder: "Например: Сдам комнату рядом с институтом"
   });
   const contentField = Components.inputField({
     label: "Описание",
     name: "content",
     placeholder: "Расскажите, что вы предлагаете или ищете...",
     multiline: true
+  });
+  const contactField = Components.inputField({
+    label: "Контакты",
+    name: "contact",
+    placeholder: "Введите свой телеграмм или телефон",
+    type: "text"
   });
 
   const submitBtn = Components.button({
@@ -699,6 +719,7 @@ async function postFormView(params) {
   card.appendChild(subtitle);
   card.appendChild(titleField.wrapper);
   card.appendChild(contentField.wrapper);
+  card.appendChild(contactField.wrapper);
   card.appendChild(submitBtn);
 
   main.appendChild(card);
@@ -710,6 +731,7 @@ async function postFormView(params) {
       if (existing) {
         titleField.control.value = existing.title || "";
         contentField.control.value = existing.content || "";
+        contactField.control.value = existing.contact || "";
         if (!State.getUser().userId && existing.user_id) {
           State.setUserMeta({ userId: existing.user_id });
         }
@@ -722,9 +744,21 @@ async function postFormView(params) {
   submitBtn.addEventListener("click", async function () {
     const titleValue = (titleField.control.value || "").trim();
     const contentValue = (contentField.control.value || "").trim();
+    const contactValue = (contactField.control.value || "").trim();
 
-    if (!titleValue || !contentValue) {
-      UI.showToast("Заполните заголовок и описание", "error");
+    if (!titleValue || !contentValue || !contactValue) {
+      UI.showToast("Заполните заголовок, описание и контакты", "error");
+      return;
+    }
+
+    // Валидация формата контактов
+    const trimmedContact = contactValue.trim();
+    const isTelegram = trimmedContact.startsWith("@");
+    const isPhone = trimmedContact.startsWith("+7");
+    const isiPhone = trimmedContact.startsWith("8");
+    
+    if (!isTelegram && !isPhone && !isiPhone) {
+      UI.showToast("Контакты должны начинаться с '@' для телеграм или '+7 / 8' для телефона", "error");
       return;
     }
 
@@ -735,13 +769,15 @@ async function postFormView(params) {
       if (isEdit && id) {
         await Api.updatePost(id, {
           title: titleValue,
-          content: contentValue
+          content: contentValue,
+          contact: contactValue
         });
         UI.showToast("Объявление обновлено", "success");
       } else {
         const created = await Api.createPost({
           title: titleValue,
-          content: contentValue
+          content: contentValue,
+          contact: contactValue
         });
         // Если бекенд вернул user_id — запоминаем
         if (created && created.user_id) {

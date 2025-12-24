@@ -202,12 +202,17 @@ function postCard(post, options) {
 
   const content = el("p", { className: "post-content" }, text);
 
+  const contact = el("p", { className: "post-contact" }, [
+    el("span", { className: "post-contact-label" }, "Контакты: "),
+    el("span", { className: "post-contact-value" }, post.contact || "не указаны")
+  ]);
+
   const metaLeft = el("div", { className: "post-meta-left" }, [
     el("span", { className: "badge" }, isMine ? "Моё объявление" : "Студент"),
     el(
       "span",
       { className: "post-email" },
-      post.user_email || "unknown@example.com"
+      post.username || "username"
     )
   ]);
 
@@ -264,6 +269,7 @@ function postCard(post, options) {
 
   root.appendChild(title);
   root.appendChild(content);
+  root.appendChild(contact);
   root.appendChild(meta);
   root.appendChild(actions);
 

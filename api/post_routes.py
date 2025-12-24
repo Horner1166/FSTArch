@@ -17,8 +17,9 @@ def create_post(post_data: PostCreate, current_user: User = Depends(get_current_
     post = Post(
         title=post_data.title,
         content=post_data.content,
+        contact=post_data.contact,
         user_id=current_user.id,
-        user_email = current_user.email
+        username = current_user.username
     )
     session.add(post)
     session.commit()
@@ -64,6 +65,8 @@ def update_post(post_id: int, post_data: PostUpdate, current_user: User = Depend
         post.title = post_data.title
     if post_data.content is not None:
         post.content = post_data.content
+    if post_data.contact is not None:
+        post.contact = post_data.contact
     
     session.add(post)
     session.commit()

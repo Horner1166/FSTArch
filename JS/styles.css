@@ -514,6 +514,22 @@ textarea.input {
   overflow-wrap: anywhere;
 }
 
+.post-contact {
+  margin: 4px 0 0 0;
+  font-size: 0.82rem;
+  color: var(--color-accent-strong);
+}
+
+.post-contact-label {
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.post-contact-value {
+  color: var(--color-accent-strong);
+  word-break: break-word;
+}
+
 .post-meta {
   display: flex;
   align-items: center;
@@ -601,6 +617,24 @@ textarea.input {
   font-size: 0.9rem;
   color: #e5e7eb;
   white-space: pre-wrap;
+}
+
+.modal-contact {
+  margin: 0 0 12px 0;
+  font-size: 0.88rem;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-contact-label {
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.modal-contact-value {
+  color: var(--color-accent-strong);
+  word-break: break-word;
 }
 
 /* ============================
