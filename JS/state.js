@@ -66,6 +66,12 @@ function setUserMeta(meta) {
   if (meta.userId !== undefined) {
     currentUser.userId = meta.userId;
   }
+  if (meta.role !== undefined) {
+    currentUser.role = meta.role;
+  }
+  if (meta.rejectedCount !== undefined) {
+    currentUser.rejectedCount = meta.rejectedCount;
+  }
   if (meta.usernameChangeCooldownUntil !== undefined) {
     currentUser.usernameChangeCooldownUntil = meta.usernameChangeCooldownUntil;
   }
@@ -84,6 +90,20 @@ function getToken() {
     : null;
 }
 
+// Проверить, является ли пользователь модератором
+function isModerator() {
+  const role = currentUser && currentUser.role ? String(currentUser.role) : "";
+  const r = role.toLowerCase();
+  return r === "moderator" || r.endsWith(".moderator") || r.includes("moderator");
+}
+
+// Проверить, является ли пользователь администратором
+function isAdmin() {
+  const role = currentUser && currentUser.role ? String(currentUser.role) : "";
+  const r = role.toLowerCase();
+  return r === "admin" || r.endsWith(".admin") || r.includes("admin");
+}
+
 export const State = {
   init,
   setAuth,
@@ -91,7 +111,9 @@ export const State = {
   isAuthenticated,
   setUserMeta,
   getUser,
-  getToken
+  getToken,
+  isModerator,
+  isAdmin
 };
 
 

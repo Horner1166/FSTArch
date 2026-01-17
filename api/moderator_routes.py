@@ -1,14 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select
 from typing import List
+from uuid import UUID
 from api.utils import get_current_user
-from models.models import User, UserRole, Post, ModerationStatus
+from models.models import User, UserRole, Post, ModerationStatus, RejectBody
 from schemas.post import PostResponse
 from db import get_session
 
-
 router = APIRouter()
-
 
 @router.get("/posts/[.get]", response_model=List[PostResponse])
 def get_pending_posts(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
@@ -22,7 +21,7 @@ def get_pending_posts(current_user: User = Depends(get_current_user), session: S
 
 
 @router.post("/posts/:id/[.post]", response_model=PostResponse)
-def approve_post(post_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def approve_post(post_id: UUID, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Одобрить и опубликовать пост"""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
         raise HTTPException(status_code=403, detail="Недостаточно прав доступа")
@@ -32,6 +31,7 @@ def approve_post(post_id: int, current_user: User = Depends(get_current_user), s
         raise HTTPException(status_code=404, detail="Пост не найден")
 
     post.moderation_status = ModerationStatus.APPROVED
+    post.rejection_reason = None
     session.add(post)
     session.commit()
     session.refresh(post)
@@ -39,9 +39,9 @@ def approve_post(post_id: int, current_user: User = Depends(get_current_user), s
     return post
 
 
-@router.delete("/posts/:id/[.delete]")
-def reject_post(post_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
-    """Отклонить и удалить пост"""
+@router.post("/posts/:id/reject/[.post]", response_model=PostResponse)
+def reject_post(post_id: UUID, reject_body: RejectBody, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Отклонить пост (без удаления) и сохранить причину"""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
         raise HTTPException(status_code=403, detail="Недостаточно прав доступа")
 
@@ -49,10 +49,13 @@ def reject_post(post_id: int, current_user: User = Depends(get_current_user), se
     if not post:
         raise HTTPException(status_code=404, detail="Пост не найден")
 
-    session.delete(post)
+    post.moderation_status = ModerationStatus.REJECTED
+    post.rejection_reason = reject_body.reason
+    session.add(post)
     session.commit()
+    session.refresh(post)
 
-    return {"msg": f"Пост №{post_id} отклонен и удален"}
+    return post
 
 
 @router.get("/users/[.get]")
@@ -66,7 +69,7 @@ def list_users(current_user: User = Depends(get_current_user), session: Session 
 
 
 @router.post("/users/:id/[.post]")
-def change_ban_status(user_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def change_ban_status(user_id: UUID, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Разбанить пользователя или забанить и удалить все его посты."""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
         raise HTTPException(status_code=403, detail="Недостаточно прав доступа")

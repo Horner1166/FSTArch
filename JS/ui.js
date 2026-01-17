@@ -6,7 +6,7 @@ let mainContainer = null;
 let headerContainer = null;
 let toastContainer = null;
 
-// Инициализация базовой разметки (оболочка приложения)
+// Инициализация базовой разметки (без оболочки)
 function initLayout() {
   if (!root) {
     console.error("Не найден элемент #app");
@@ -18,20 +18,15 @@ function initLayout() {
   toastContainer = document.createElement("div");
   toastContainer.className = "toast-container";
 
-  const shell = document.createElement("div");
-  shell.className = "shell";
-
   headerContainer = document.createElement("div");
   headerContainer.className = "shell-header";
 
   mainContainer = document.createElement("main");
   mainContainer.className = "shell-main";
 
-  shell.appendChild(headerContainer);
-  shell.appendChild(mainContainer);
-
   root.appendChild(toastContainer);
-  root.appendChild(shell);
+  root.appendChild(headerContainer);
+  root.appendChild(mainContainer);
 }
 
 // Вернуть контейнер для основного контента
@@ -49,6 +44,24 @@ function clearMain() {
   if (mainContainer) {
     mainContainer.innerHTML = "";
   }
+}
+
+// Плавное появление контента страницы
+function animatePageIn() {
+  if (!mainContainer) return;
+  mainContainer.classList.remove("page-enter");
+  mainContainer.classList.remove("page-enter-active");
+
+  // Форсируем reflow, чтобы анимация запускалась при каждом переходе
+  // eslint-disable-next-line no-unused-expressions
+  mainContainer.offsetHeight;
+
+  mainContainer.classList.add("page-enter");
+
+  requestAnimationFrame(function () {
+    if (!mainContainer) return;
+    mainContainer.classList.add("page-enter-active");
+  });
 }
 
 // Показать toast-уведомление
@@ -86,9 +99,9 @@ function showToast(message, type = "info") {
 // Установить заголовок вкладки
 function setPageTitle(title) {
   if (!title) {
-    document.title = "DrugNet — объявления для студентов";
+    document.title = "LightNet — сервис объявлений";
   } else {
-    document.title = title + " — CampusBoard";
+    document.title = title + " — LightNet";
   }
 }
 
@@ -97,6 +110,7 @@ export const UI = {
   getMainContainer,
   getHeaderContainer,
   clearMain,
+  animatePageIn,
   showToast,
   setPageTitle
 };

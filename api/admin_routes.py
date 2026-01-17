@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select
+from uuid import UUID
 from api.utils import get_current_user
 from models.models import User, UserRole
 from db import get_session
@@ -7,7 +8,7 @@ from db import get_session
 router = APIRouter()
 
 @router.post("/users/:id/[.post]")
-def change_moder_role(user_id: int, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def change_moder_role(user_id: UUID, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Сделать пользователя модератором или убрать роль модератора"""
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Недостаточно прав доступа")

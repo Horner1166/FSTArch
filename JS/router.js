@@ -2,6 +2,8 @@
 // Управляет разбором hash и вызовом соответствующих обработчиков страниц
 
 let routes = {};
+let history = ["/"];
+let currentIndex = 0;
 
 // Инициализация таблицы маршрутов
 function init(routesMap) {
@@ -11,11 +13,35 @@ function init(routesMap) {
 }
 
 // Программная навигация
-function navigate(path) {
+function navigate(path, addToHistory = true) {
   if (!path.startsWith("/")) {
     path = "/" + path;
   }
+  
+  if (addToHistory && currentIndex >= 0) {
+    const currentPath = parseHash();
+    if (currentPath !== path) {
+      history = history.slice(0, currentIndex + 1);
+      history.push(currentPath);
+      currentIndex = history.length - 1;
+    }
+  }
+  
   window.location.hash = "#" + path;
+}
+
+// Функция для возврата назад
+function goBack() {
+  if (currentIndex > 0) {
+    currentIndex--;
+    const targetPath = history[currentIndex];
+    window.location.hash = "#" + targetPath;
+  }
+}
+
+// Проверка возможности вернуться назад
+function canGoBack() {
+  return currentIndex > 0;
 }
 
 // Разбор текущего hash
@@ -75,7 +101,9 @@ function handleRouteChange() {
 
 export const Router = {
   init,
-  navigate
+  navigate,
+  goBack,
+  canGoBack
 };
 
 

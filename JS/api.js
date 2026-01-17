@@ -17,7 +17,11 @@ const ENDPOINTS = {
   getPost: "/posts/:id/[.get]",
   updatePost: "/posts/:id/[.put]",
   deletePost: "/posts/:id/[.delete]",
-  getUserPosts: "/posts/:user_id/[.get]"
+  getUserPosts: "/posts/:user_id/[.get]",
+  // Admin moderation endpoints (served under /moderator on backend)
+  getPendingPosts: "/moderator/posts/[.get]",
+  approvePost: "/moderator/posts/:id/[.post]",
+  rejectPost: "/moderator/posts/:id/reject/[.post]"
 };
 
 // Универсальный helper для HTTP-запросов
@@ -38,10 +42,16 @@ async function request(path, options) {
     }
   }
 
+  const requestBody = body
+    ? typeof body === "string"
+      ? body
+      : JSON.stringify(body)
+    : null;
+
   const response = await fetch(Config.apiBaseUrl + path, {
     method: method,
     headers: headers,
-    body: body ? JSON.stringify(body) : null
+    body: requestBody
   });
 
   // Обработка 204 (нет контента)
@@ -159,6 +169,32 @@ function getUserPosts(userId) {
   });
 }
 
+// Moderator functions
+async function getPendingPosts() {
+  const path = ENDPOINTS.getPendingPosts;
+  return request(path, {
+    method: "GET",
+    auth: true
+  });
+}
+
+async function approvePost(id) {
+  const path = `${ENDPOINTS.approvePost}?post_id=${encodeURIComponent(id)}`;
+  return request(path, {
+    method: "POST",
+    auth: true
+  });
+}
+
+async function rejectPost(id, reason) {
+  const path = `${ENDPOINTS.rejectPost}?post_id=${encodeURIComponent(id)}`;
+  return request(path, {
+    method: "POST",
+    body: { reason },
+    auth: true
+  });
+}
+
 export const Api = {
   requestCode,
   authorize,
@@ -169,7 +205,11 @@ export const Api = {
   createPost,
   updatePost,
   deletePost,
-  getUserPosts
+  getUserPosts,
+  // Moderator functions
+  getPendingPosts,
+  approvePost,
+  rejectPost
 };
 
 

@@ -31,6 +31,7 @@ async function homeView() {
   renderShell();
   const main = UI.getMainContainer();
   UI.clearMain();
+  UI.animatePageIn();
   UI.setPageTitle("Объявления");
 
   if (!main) return;
@@ -40,12 +41,12 @@ async function homeView() {
       Components.el(
         "h1",
         { className: "hero-title" },
-        "Объявления института"
+        "LightNet - площадка бесплатных объявлений для ваших товаров и услуг"
       ),
       Components.el(
         "p",
         { className: "hero-subtitle" },
-        "Находите жильё, подработку, учёбу и новые знакомства внутри студенческого комьюнити."
+        "Размещайте и находите объявления быстро и удобно — в одном месте."
       )
     ]),
     State.isAuthenticated()
@@ -121,8 +122,8 @@ async function homeView() {
 
     const filtered = allPosts.filter(function (post) {
       if (onlyMine) {
-        if (!currentUser || !currentUser.email) return false;
-        if (post.user_email !== currentUser.email) return false;
+        if (!currentUser || !currentUser.userId) return false;
+        if (post.user_id !== currentUser.userId) return false;
       }
       if (!query) return true;
       const combined =
@@ -143,7 +144,7 @@ async function homeView() {
 
     filtered.forEach(function (post) {
       const isMine =
-        currentUser && currentUser.email === post.user_email;
+        currentUser && currentUser.userId && post.user_id === currentUser.userId;
       const card = Components.postCard(post, {
         isMine: isMine,
         onOpen: function (p) {
@@ -246,6 +247,7 @@ function loginView(_options) {
     renderShell();
     const main = UI.getMainContainer();
     UI.clearMain();
+    UI.animatePageIn();
     UI.setPageTitle("Вход");
 
     if (!main) return;
@@ -364,6 +366,7 @@ function loginView(_options) {
               State.setUserMeta({
                 username: me.username,
                 userId: me.id,
+                role: me.role,
                 // если сейчас смена ника запрещена, сохраняем время, когда её снова можно будет сделать
                 usernameChangeCooldownUntil: me.next_username_change_at || null
               });
@@ -408,6 +411,7 @@ async function dashboardView() {
       State.setUserMeta({
         username: me.username,
         userId: me.id,
+        role: me.role,
         usernameChangeCooldownUntil: me.next_username_change_at || null
       });
     }
@@ -418,6 +422,7 @@ async function dashboardView() {
   renderShell();
   const main = UI.getMainContainer();
   UI.clearMain();
+  UI.animatePageIn();
   UI.setPageTitle("Личный кабинет");
 
   if (!main) return;
@@ -593,11 +598,11 @@ async function dashboardView() {
     { className: "panel-subtitle" },
     "Здесь будут все ваши объявления. Новые публикации сначала проходят модерацию."
   );
-  const list = Components.el("div", { className: "posts-grid" });
+  const postsList = Components.el("div", { className: "posts-grid" });
 
   postsCard.appendChild(postsTitle);
   postsCard.appendChild(postsInfo);
-  postsCard.appendChild(list);
+  postsCard.appendChild(postsList);
 
   main.appendChild(headerRow);
   main.appendChild(usernameCard);
@@ -605,22 +610,45 @@ async function dashboardView() {
 
   let posts = [];
   try {
-    if (user.userId) {
-      // Если мы уже знаем userId — берём полную выборку по пользователю
-      posts = await Api.getUserPosts(user.userId);
+    const effectiveUserId = (me && me.id) ? me.id : user.userId;
+    console.log("Dashboard: effectiveUserId =", effectiveUserId, "me =", me, "user =", user);
+    
+    if (effectiveUserId) {
+      // Если мы знаем userId — берём полную выборку по пользователю (включая rejected/pending)
+      posts = await Api.getUserPosts(effectiveUserId);
+      console.log("Dashboard: getUserPosts result =", posts);
     } else {
       // Иначе фильтруем одобренные объявления по email
       const all = await Api.getAllPosts();
       posts = all.filter(function (p) {
-        return p.user_email === user.email;
+        return p.username && user.username && p.username === user.username;
       });
+      console.log("Dashboard: fallback filter result =", posts);
     }
   } catch (err) {
-    console.error(err);
+    console.error("Dashboard error loading posts:", err);
+  }
+
+  if (!Array.isArray(posts)) {
+    posts = [];
+  }
+
+  // Бейдж на вкладке "Личный кабинет": количество отклонённых объявлений
+  try {
+    const rejectedCount = Array.isArray(posts)
+      ? posts.filter(function (p) {
+          const s = p && p.moderation_status ? String(p.moderation_status).toLowerCase() : "";
+          return s.includes("rejected");
+        }).length
+      : 0;
+    State.setUserMeta({ rejectedCount: rejectedCount });
+    renderShell();
+  } catch (_e) {
+    // ignore
   }
 
   if (!posts || posts.length === 0) {
-    list.appendChild(
+    postsList.appendChild(
       Components.el(
         "p",
         { className: "empty-state" },
@@ -633,30 +661,35 @@ async function dashboardView() {
   posts.forEach(function (post) {
     const card = Components.postCard(post, {
       isMine: true,
-      onOpen: function () {
-        Router.navigate("/edit/" + post.id);
-      },
-      onEdit: function () {
-        Router.navigate("/edit/" + post.id);
+      onOpen: openPostModal,
+      onEdit: function (p) {
+        Router.navigate("/edit/" + p.id);
       },
       onDelete: async function (p) {
-        if (
-          !window.confirm(
-            "Удалить это объявление без возможности восстановления?"
-          )
-        ) {
-          return;
-        }
+        if (!confirm("Удалить объявление?")) return;
         try {
           await Api.deletePost(p.id);
           UI.showToast("Объявление удалено", "success");
-          list.removeChild(card);
-        } catch (err) {
-          console.error(err);
+          dashboardView();
+        } catch (e) {
+          console.error(e);
+          UI.showToast("Не удалось удалить", "error");
         }
       }
     });
-    list.appendChild(card);
+
+    // Если объявление отклонено — показываем причину
+    const status = post && post.moderation_status ? String(post.moderation_status).toLowerCase() : "";
+    if (status.includes("rejected") && post.rejection_reason) {
+      card.appendChild(
+        Components.el(
+          "div",
+          { className: "post-rejection" },
+          "Причина отклонения: " + post.rejection_reason
+        )
+      );
+    }
+    postsList.appendChild(card);
   });
 }
 
@@ -670,6 +703,7 @@ async function postFormView(params) {
   renderShell();
   const main = UI.getMainContainer();
   UI.clearMain();
+  UI.animatePageIn();
   UI.setPageTitle(
     isEdit ? "Редактирование объявления" : "Новое объявление"
   );
@@ -694,7 +728,7 @@ async function postFormView(params) {
   const titleField = Components.inputField({
     label: "Заголовок",
     name: "title",
-    placeholder: "Например: Сдам комнату рядом с институтом"
+    placeholder: "Например: Продам велосипед, Сдам комнату, Ищу мастера"
   });
   const contentField = Components.inputField({
     label: "Описание",
@@ -706,6 +740,22 @@ async function postFormView(params) {
     label: "Контакты",
     name: "contact",
     placeholder: "Введите свой телеграмм или телефон",
+    type: "text"
+  });
+  const cityField = Components.inputField({
+    label: "Город",
+    name: "city",
+    placeholder: "Например: Москва"
+  });
+  const streetField = Components.inputField({
+    label: "Улица",
+    name: "street",
+    placeholder: "Например: Ленина, 15"
+  });
+  const priceField = Components.inputField({
+    label: "Цена",
+    name: "price",
+    placeholder: "Например: 5000",
     type: "text"
   });
 
@@ -720,6 +770,9 @@ async function postFormView(params) {
   card.appendChild(titleField.wrapper);
   card.appendChild(contentField.wrapper);
   card.appendChild(contactField.wrapper);
+  card.appendChild(cityField.wrapper);
+  card.appendChild(streetField.wrapper);
+  card.appendChild(priceField.wrapper);
   card.appendChild(submitBtn);
 
   main.appendChild(card);
@@ -732,6 +785,9 @@ async function postFormView(params) {
         titleField.control.value = existing.title || "";
         contentField.control.value = existing.content || "";
         contactField.control.value = existing.contact || "";
+        cityField.control.value = existing.city || "";
+        streetField.control.value = existing.street || "";
+        priceField.control.value = existing.price || "";
         if (!State.getUser().userId && existing.user_id) {
           State.setUserMeta({ userId: existing.user_id });
         }
@@ -745,6 +801,9 @@ async function postFormView(params) {
     const titleValue = (titleField.control.value || "").trim();
     const contentValue = (contentField.control.value || "").trim();
     const contactValue = (contactField.control.value || "").trim();
+    const cityValue = (cityField.control.value || "").trim();
+    const streetValue = (streetField.control.value || "").trim();
+    const priceValue = (priceField.control.value || "").trim();
 
     if (!titleValue || !contentValue || !contactValue) {
       UI.showToast("Заполните заголовок, описание и контакты", "error");
@@ -770,14 +829,20 @@ async function postFormView(params) {
         await Api.updatePost(id, {
           title: titleValue,
           content: contentValue,
-          contact: contactValue
+          contact: contactValue,
+          city: cityValue,
+          street: streetValue,
+          price: priceValue
         });
         UI.showToast("Объявление обновлено", "success");
       } else {
         const created = await Api.createPost({
           title: titleValue,
           content: contentValue,
-          contact: contactValue
+          contact: contactValue,
+          city: cityValue,
+          street: streetValue,
+          price: priceValue
         });
         // Если бекенд вернул user_id — запоминаем
         if (created && created.user_id) {
@@ -805,6 +870,7 @@ function contactsView() {
   renderShell();
   const main = UI.getMainContainer();
   UI.clearMain();
+  UI.animatePageIn();
   UI.setPageTitle("Контакты");
 
   if (!main) return;
@@ -826,8 +892,8 @@ function contactsView() {
 
   const list = Components.el("ul", { className: "contacts-list" });
   const items = [
-    { label: "Email поддержки", value: "drug-net@mail.ru" },
-    { label: "Telegram", value: "@DrugNet" },
+    { label: "Email поддержки", value: "light-net@mail.ru" },
+    { label: "Telegram", value: "@LightNet" },
     {
       label: "Часы работы",
       value: "Пн–Пт, 10:00–19:00 по московскому времени"
@@ -856,12 +922,275 @@ function contactsView() {
   main.appendChild(card);
 }
 
+// ---------- Страница модератора ----------
+function moderatorView() {
+  renderShell();
+  const main = UI.getMainContainer();
+  UI.clearMain();
+  UI.animatePageIn();
+  
+  if (!main) return;
+  
+  // Проверка прав доступа
+  if (!State.isAdmin()) {
+    const card = Components.el("section", { className: "panel panel-large" }, [
+      Components.el("h1", { className: "panel-title" }, "Доступ запрещен"),
+      Components.el("p", { className: "panel-subtitle" }, "У вас нет прав администратора для доступа к этой странице.")
+    ]);
+    main.appendChild(card);
+    return;
+  }
+  
+  UI.setPageTitle("Объявления на модерации");
+  
+  // Заголовок страницы
+  const header = Components.el("div", { className: "moderator-header" }, [
+    Components.el("h1", { className: "panel-title" }, "Объявления на модерации"),
+    Components.el("p", { className: "panel-subtitle" }, "Проверьте и одобрите или отклоните новые объявления.")
+  ]);
+  
+  // Контейнер для списка объявлений
+  const postsContainer = Components.el("div", { className: "posts-grid moderator-posts" });
+  
+  // Функция загрузки и отображения объявлений
+  async function loadPendingPosts() {
+    try {
+      postsContainer.innerHTML = '<div style="text-align: center; padding: 40px;">🔄 Загрузка...</div>';
+      
+      const posts = await Api.getPendingPosts();
+      
+      if (!posts || posts.length === 0) {
+        postsContainer.innerHTML = '<div style="text-align: center; padding: 40px; opacity: 0.7;">Нет объявлений на модерации</div>';
+        return;
+      }
+      
+      postsContainer.innerHTML = '';
+      
+      posts.forEach(post => {
+        const postCard = createModeratorPostCard(post);
+        postsContainer.appendChild(postCard);
+      });
+
+      // Обновляем хедер, чтобы бейджи отражали актуальное состояние
+      renderShell();
+      
+    } catch (error) {
+      console.error('Error loading pending posts:', error);
+      postsContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #ef4444;">Ошибка загрузки объявлений</div>';
+    }
+  }
+  
+  // Создание карточки объявления для модератора
+  function createModeratorPostCard(post) {
+    const card = Components.el("article", { className: "post-card moderator-card" });
+    
+    const title = Components.el("h3", { className: "post-title" }, post.title || "Без заголовка");
+    title.style.fontSize = "calc(1.25rem + 4pt)";
+    
+    const text = (post.content || "").length > 180
+      ? (post.content || "").slice(0, 177) + "..."
+      : post.content || "";
+    
+    const content = Components.el("p", { className: "post-content" }, text);
+    
+    // Информация о контактах и местоположении
+    const contactInfo = Components.el("div", { className: "post-contact" }, [
+      Components.el("span", { className: "post-contact-label" }, "Контакты: "),
+      Components.el("span", { className: "post-contact-value" }, post.contact || "не указаны")
+    ]);
+    
+    // Новые поля
+    const locationInfo = Components.el("div", { className: "post-location" }, [
+      Components.el("span", { className: "post-location-label" }, "Местоположение: "),
+      Components.el("span", { className: "post-location-value" }, 
+        (post.city && post.street) ? `${post.city}, ${post.street}` : 
+        post.city || post.street || "не указано"
+      )
+    ]);
+    
+    const priceInfo = Components.el("div", { className: "post-price" }, [
+      Components.el("span", { className: "post-price-label" }, "Цена: "),
+      Components.el("span", { className: "post-price-value" }, post.price || "не указана")
+    ]);
+    
+    // Метаданные
+    const meta = Components.el("div", { className: "post-meta" }, [
+      Components.el("div", { className: "post-meta-left" }, [
+        Components.el("span", { className: "badge" }, "На модерации"),
+        Components.el("span", { className: "post-email" }, post.username || "username")
+      ]),
+      Components.el("div", { className: "post-meta-right" }, [
+        Components.el("span", { className: "post-date" }, new Date(post.created_at).toLocaleString("ru-RU"))
+      ])
+    ]);
+    
+    // Кнопки действий модератора
+    const actions = Components.el("div", { className: "moderator-actions" });
+    
+    const viewBtn = Components.button({
+      label: "Открыть объявление",
+      variant: "secondary",
+      size: "sm",
+      onClick: () => openModeratorPostModal(post)
+    });
+    
+    const approveBtn = Components.button({
+      label: "Принять объявление",
+      variant: "primary",
+      size: "sm",
+      onClick: () => approvePost(post.id)
+    });
+    
+    const rejectBtn = Components.button({
+      label: "Отклонить объявление",
+      variant: "danger",
+      size: "sm",
+      onClick: () => rejectPost(post.id)
+    });
+    
+    actions.appendChild(viewBtn);
+    actions.appendChild(approveBtn);
+    actions.appendChild(rejectBtn);
+    
+    // Собираем карточку
+    card.appendChild(title);
+    card.appendChild(content);
+    card.appendChild(contactInfo);
+    card.appendChild(locationInfo);
+    card.appendChild(priceInfo);
+    card.appendChild(meta);
+    card.appendChild(actions);
+    
+    return card;
+  }
+  
+  // Функция одобрения объявления
+  async function approvePost(postId) {
+    try {
+      await Api.approvePost(postId);
+      UI.showToast("Объявление одобрено", "success");
+      loadPendingPosts(); // Перезагружаем список
+      renderShell();
+    } catch (error) {
+      console.error('Error approving post:', error);
+      UI.showToast("Ошибка при одобрении объявления", "error");
+    }
+  }
+  
+  async function rejectPostWithReason(postId, reason) {
+    try {
+      await Api.rejectPost(postId, reason);
+      UI.showToast("Объявление отклонено", "success");
+      loadPendingPosts();
+      renderShell();
+    } catch (error) {
+      console.error("Error rejecting post:", error);
+      UI.showToast("Ошибка при отклонении объявления", "error");
+    }
+  }
+
+  // Функция отклонения объявления (с запросом причины)
+  async function rejectPost(postId) {
+    const reason = prompt("Почему объявление отклонено?");
+    if (!reason) return;
+    await rejectPostWithReason(postId, reason);
+  }
+  
+  // Модальное окно для просмотра объявления
+  function openModeratorPostModal(post) {
+    const overlay = Components.el("div", { className: "modal-overlay" });
+    const modal = Components.el("div", { className: "modal modal-moderator" });
+    
+    const title = Components.el("h2", { className: "modal-title" }, post.title || "Без заголовка");
+    
+    const content = Components.el("div", { className: "modal-content" }, [
+      Components.el("p", {}, post.content || "Нет описания")
+    ]);
+    
+    const contact = Components.el("div", { className: "modal-contact" }, [
+      Components.el("strong", {}, "Контакты: "),
+      Components.el("span", {}, post.contact || "не указаны")
+    ]);
+    
+    const location = Components.el("div", { className: "modal-location" }, [
+      Components.el("strong", {}, "Местоположение: "),
+      Components.el("span", {}, (post.city && post.street) ? `${post.city}, ${post.street}` : 
+        post.city || post.street || "не указано")
+    ]);
+    
+    const price = Components.el("div", { className: "modal-price" }, [
+      Components.el("strong", {}, "Цена: "),
+      Components.el("span", {}, post.price || "не указана")
+    ]);
+    
+    const actions = Components.el("div", { className: "modal-actions moderator-actions" });
+    
+    const approveBtn = Components.button({
+      label: "Принять объявление",
+      variant: "primary",
+      size: "md",
+      onClick: async () => {
+        await approvePost(post.id);
+        document.body.removeChild(overlay);
+      }
+    });
+    
+    const rejectBtn = Components.button({
+      label: "Отклонить объявление",
+      variant: "danger",
+      size: "md",
+      onClick: async () => {
+        const reason = prompt("Почему объявление отклонено?");
+        if (reason) {
+          await rejectPostWithReason(post.id, reason);
+          document.body.removeChild(overlay);
+        }
+      }
+    });
+    
+    const closeBtn = Components.button({
+      label: "Закрыть",
+      variant: "secondary",
+      size: "sm",
+      onClick: () => document.body.removeChild(overlay)
+    });
+    
+    actions.appendChild(approveBtn);
+    actions.appendChild(rejectBtn);
+    actions.appendChild(closeBtn);
+    
+    modal.appendChild(title);
+    modal.appendChild(content);
+    modal.appendChild(contact);
+    modal.appendChild(location);
+    modal.appendChild(price);
+    modal.appendChild(actions);
+    
+    overlay.appendChild(modal);
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay);
+      }
+    });
+    
+    document.body.appendChild(overlay);
+  }
+  
+  // Собираем страницу
+  main.appendChild(header);
+  main.appendChild(postsContainer);
+  
+  // Загружаем объявления
+  loadPendingPosts();
+}
+
 export const Views = {
   homeView,
   loginView,
   dashboardView,
   postFormView,
-  contactsView
+  contactsView,
+  moderatorView
 };
 
 
