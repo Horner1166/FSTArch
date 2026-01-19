@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from api import auth_routes, post_routes, admin_routes, moderator_routes, upload_routes
+from api import auth_routes, user_routes, post_routes, admin_routes, moderator_routes, upload_routes
 from db import init_db
 from core.cleanup import start_cleanup_thread
 
@@ -34,6 +34,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_routes.router, prefix="/auth", tags=["Auth Functions"])
+app.include_router(user_routes.router, prefix="/user", tags=["User Functions"])
 app.include_router(post_routes.router, prefix="/posts", tags=["Posts Functions"])
 app.include_router(upload_routes.router, prefix="/upload", tags=["Upload Functions"])
 app.include_router(moderator_routes.router, prefix="/moderator", tags=["Moderator Functions"])

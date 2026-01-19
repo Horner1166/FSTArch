@@ -20,7 +20,7 @@ def get_pending_posts(current_user: User = Depends(get_current_user), session: S
     return posts
 
 
-@router.post("/posts/:id/[.post]", response_model=PostResponse)
+@router.post("/posts/approve/:id/[.post]", response_model=PostResponse)
 def approve_post(post_id: UUID, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Одобрить и опубликовать пост"""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:
@@ -39,7 +39,7 @@ def approve_post(post_id: UUID, current_user: User = Depends(get_current_user), 
     return post
 
 
-@router.post("/posts/:id/reject/[.post]", response_model=PostResponse)
+@router.post("/posts/reject/:id/[.post]", response_model=PostResponse)
 def reject_post(post_id: UUID, reject_body: RejectBody, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Отклонить пост (без удаления) и сохранить причину"""
     if current_user.role != UserRole.ADMIN and current_user.role != UserRole.MODERATOR:

@@ -19,7 +19,7 @@ def create_post(
     street: Optional[str] = Form(None),
     price: Optional[str] = Form(None),
     images: Optional[List[UploadFile]] = File(None),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_user),
     session: Session = Depends(get_session)
 ):
     """Создать пост с возможностью загрузки до 10 изображений"""
@@ -94,7 +94,7 @@ def update_post(
     price: Optional[str] = Form(None),
     images: Optional[List[UploadFile]] = File(None),
     replace_images: bool = Form(False),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_user),
     session: Session = Depends(get_session),
 ):
     """Редактировать пост по ID. Можно заменить все изображения или добавить новые (до 10 в сумме)."""
@@ -154,7 +154,7 @@ def update_post(
     return post
 
 @router.delete("/:id/[.delete]", status_code=204)
-def delete_post(post_id: UUID, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def delete_post(post_id: UUID, current_user: Optional[User] = Depends(get_current_user), session: Session = Depends(get_session)):
     """Удалить пост по ID и все связанные изображения"""
     post = session.get(Post, post_id)
     if not post:
@@ -178,10 +178,7 @@ def get_user_posts(user_id: UUID, current_user: Optional[User] = Depends(get_opt
     if current_user and (current_user.role == UserRole.ADMIN or current_user.id == user_id):
         stmt = select(Post).where(Post.user_id == user_id).order_by(Post.created_at.desc())
     else:
-        stmt = select(Post).where(
-            Post.user_id == user_id,
-            Post.moderation_status == ModerationStatus.APPROVED
-        ).order_by(Post.created_at.desc())
+        stmt = select(Post).where(Post.user_id == user_id, Post.moderation_status == ModerationStatus.APPROVED).order_by(Post.created_at.desc())
     
     posts = session.exec(stmt).all()
     for post in posts:
