@@ -10,8 +10,8 @@ import { UI } from "./ui.js";
 const ENDPOINTS = {
   requestCode: "/auth/[.post]",
   authorize: "/auth/login/[.post]",
-  updateUsername: "/auth/[.put]",
-  getMe: "/auth/[.get]",
+  updateUsername: "/user/[.put]",
+  getMe: "/user/[.get]",
   createPost: "/posts/[.post]",
   getAllPosts: "/posts/[.get]",
   getPost: "/posts/:id/[.get]",
@@ -20,8 +20,8 @@ const ENDPOINTS = {
   getUserPosts: "/posts/:user_id/[.get]",
   // Admin moderation endpoints (served under /moderator on backend)
   getPendingPosts: "/moderator/posts/[.get]",
-  approvePost: "/moderator/posts/:id/[.post]",
-  rejectPost: "/moderator/posts/:id/reject/[.post]"
+  approvePost: "/moderator/posts/approve/:id/[.post]",
+  rejectPost: "/moderator/posts/reject/:id/[.post]"
 };
 
 // Универсальный helper для HTTP-запросов
