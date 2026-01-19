@@ -1,35 +1,57 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from sqlmodel import Session, select
 from typing import List, Optional
 from uuid import UUID
 from api.utils import get_current_user, get_optional_user
 from models.models import User, UserRole, Post, ModerationStatus, PostImage
-from schemas.post import PostCreate, PostUpdate, PostResponse
+from schemas.post import PostResponse
 from db import get_session
-from core.upload_config import delete_file_from_s3
+from core.upload_config import delete_file_from_s3, upload_file_to_s3
 
 router = APIRouter()
 
 @router.post("/[.post]", response_model=PostResponse, status_code=201)
-def create_post(post_data: PostCreate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
-    """Создать пост"""
+def create_post(
+    title: Optional[str] = Form(None),
+    content: Optional[str] = Form(None),
+    contact: Optional[str] = Form(None),
+    city: Optional[str] = Form(None),
+    street: Optional[str] = Form(None),
+    price: Optional[str] = Form(None),
+    images: Optional[List[UploadFile]] = File(None),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Создать пост с возможностью загрузки до 10 изображений"""
     if current_user.is_banned:
         raise HTTPException(status_code=403, detail="Вы забанены и не можете создавать посты")
-    
+
+    if images and len(images) > 10:
+        raise HTTPException(status_code=400, detail="Можно загрузить максимум 10 изображений")
+
     post = Post(
-        title=post_data.title,
-        content=post_data.content,
-        contact=post_data.contact,
-        city=post_data.city,
-        street=post_data.street,
-        price=post_data.price,
+        title=title,
+        content=content,
+        contact=contact,
+        city=city,
+        street=street,
+        price=price,
         user_id=current_user.id,
-        username = current_user.username
+        username=current_user.username
     )
     session.add(post)
     session.commit()
     session.refresh(post)
-    post.images = []
+
+    if images:
+        for file in images:
+            url = upload_file_to_s3(file)
+            post_image = PostImage(post_id=post.id, image_url=url)
+            session.add(post_image)
+        session.commit()
+        session.refresh(post)
+
+    post.images = session.exec(select(PostImage).where(PostImage.post_id == post.id)).all()
     return post
 
 @router.get("/[.get]", response_model=List[PostResponse])
@@ -62,8 +84,20 @@ def get_post(post_id: UUID, current_user: Optional[User] = Depends(get_optional_
     return post
 
 @router.put("/:id/[.put]", response_model=PostResponse)
-def update_post(post_id: UUID, post_data: PostUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
-    """Редактировать пост по ID"""
+def update_post(
+    post_id: UUID,
+    title: Optional[str] = Form(None),
+    content: Optional[str] = Form(None),
+    contact: Optional[str] = Form(None),
+    city: Optional[str] = Form(None),
+    street: Optional[str] = Form(None),
+    price: Optional[str] = Form(None),
+    images: Optional[List[UploadFile]] = File(None),
+    replace_images: bool = Form(False),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Редактировать пост по ID. Можно заменить все изображения или добавить новые (до 10 в сумме)."""
     post = session.get(Post, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Пост не найден")
@@ -71,21 +105,47 @@ def update_post(post_id: UUID, post_data: PostUpdate, current_user: User = Depen
     if post.user_id != current_user.id and current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Недостаточно прав доступа")
 
-    if post_data.title is not None:
-        post.title = post_data.title
-    if post_data.content is not None:
-        post.content = post_data.content
-    if post_data.contact is not None:
-        post.contact = post_data.contact
-
-    if post_data.city is not None:
-        post.city = post_data.city
-    if post_data.street is not None:
-        post.street = post_data.street
-    if post_data.price is not None:
-        post.price = post_data.price
+    # Обновляем текстовые поля, если переданы
+    if title is not None:
+        post.title = title
+    if content is not None:
+        post.content = content
+    if contact is not None:
+        post.contact = contact
+    if city is not None:
+        post.city = city
+    if street is not None:
+        post.street = street
+    if price is not None:
+        post.price = price
 
     post.moderation_status = ModerationStatus.PENDING
+
+    # Если переданы файлы, либо заменяем, либо добавляем
+    if images is not None:
+        existing_images = session.exec(select(PostImage).where(PostImage.post_id == post.id)).all()
+
+        if replace_images:
+            to_delete = existing_images
+            remaining = 0
+        else:
+            to_delete = []
+            remaining = len(existing_images)
+
+        if remaining + len(images) > 10:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Можно максимум 10 изображений. Сейчас {remaining}, новых {len(images)}"
+            )
+
+        for image in to_delete:
+            delete_file_from_s3(image.image_url)
+            session.delete(image)
+
+        # Загружаем новые изображения
+        for file in images:
+            url = upload_file_to_s3(file)
+            session.add(PostImage(post_id=post.id, image_url=url))
 
     session.add(post)
     session.commit()
@@ -110,7 +170,7 @@ def delete_post(post_id: UUID, current_user: User = Depends(get_current_user), s
 
     session.delete(post)
     session.commit()
-    return post.images
+    return post
 
 @router.get("/:user_id/[.get]", response_model=List[PostResponse])
 def get_user_posts(user_id: UUID, current_user: Optional[User] = Depends(get_optional_user), session: Session = Depends(get_session)):

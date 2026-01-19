@@ -4,22 +4,6 @@ from typing import Optional, List
 from uuid import UUID
 from models.models import ModerationStatus
 
-class PostCreate(BaseModel):
-    title: str
-    content: str
-    contact: str
-    city: Optional[str] = None
-    street: Optional[str] = None
-    price: Optional[str] = None
-
-class PostUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    contact: Optional[str] = None
-    city: Optional[str] = None
-    street: Optional[str] = None
-    price: Optional[str] = None
-
 class PostImageResponse(BaseModel):
     id: UUID
     image_url: str
