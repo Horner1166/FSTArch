@@ -320,7 +320,11 @@ function postCard(post, options) {
   if (post.images && Array.isArray(post.images) && post.images.length > 0) {
     imagesSection = el("div", { className: "post-images" });
     
-    post.images.slice(0, 3).forEach(function(imageUrl) {
+    post.images.slice(0, 3).forEach(function(imageItem) {
+      // Извлекаем URL из объекта или используем строку напрямую
+      const imageUrl = typeof imageItem === 'string' ? imageItem : (imageItem.image_url || imageItem.url || '');
+      if (!imageUrl) return;
+      
       const img = el("img", {
         className: "post-image",
         attrs: {
@@ -328,10 +332,8 @@ function postCard(post, options) {
           alt: "Фото объявления"
         }
       });
-      img.addEventListener("click", function(e) {
-        e.stopPropagation();
-        window.open(imageUrl, "_blank");
-      });
+      // Убираем открытие в новой вкладке - теперь просто превью
+      img.style.cursor = "default";
       imagesSection.appendChild(img);
     });
     

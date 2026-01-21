@@ -193,7 +193,11 @@ async function homeView() {
     if (post.images && Array.isArray(post.images) && post.images.length > 0) {
       imagesSection = Components.el("div", { className: "modal-images" });
       
-      post.images.forEach(function(imageUrl) {
+      post.images.forEach(function(imageItem) {
+        // Извлекаем URL из объекта или используем строку напрямую
+        const imageUrl = typeof imageItem === 'string' ? imageItem : (imageItem.image_url || imageItem.url || '');
+        if (!imageUrl) return;
+        
         const img = Components.el("img", {
           className: "modal-image",
           attrs: {
@@ -201,9 +205,8 @@ async function homeView() {
             alt: "Фото объявления"
           }
         });
-        img.addEventListener("click", function() {
-          window.open(imageUrl, "_blank");
-        });
+        // Убираем открытие в новой вкладке - теперь просто превью
+        img.style.cursor = "default";
         imagesSection.appendChild(img);
       });
     }
@@ -790,7 +793,7 @@ async function postFormView(params) {
 
   // Image upload section
   const imageSection = Components.el("div", { className: "image-upload-section" });
-  const imageLabel = Components.el("label", { className: "image-upload-label" }, "Фотографии");
+  const imageLabel = Components.el("label", { className: "image-upload-label" }, "Фотографии (до 10)");
   
   // Create upload button
   const imageUploadButton = Components.button({
@@ -805,8 +808,15 @@ async function postFormView(params) {
       hiddenInput.multiple = true;
       hiddenInput.style.display = "none";
       
-      hiddenInput.addEventListener("change", async function(e) {
+      hiddenInput.addEventListener("change", function(e) {
         const files = Array.from(e.target.files);
+        
+        // Проверяем общее количество изображений
+        if (uploadedImageFiles.length + files.length > 10) {
+          UI.showToast("Можно загрузить максимум 10 изображений", "error");
+          document.body.removeChild(hiddenInput);
+          return;
+        }
         
         for (const file of files) {
           if (file.size > 5 * 1024 * 1024) {
@@ -814,17 +824,17 @@ async function postFormView(params) {
             continue;
           }
           
-          try {
-            UI.showToast("Загружаем изображение...", "info");
-            const result = await Api.uploadImage(file);
-            uploadedImages.push(result.url);
-            
-            // Add preview
+          // Добавляем файл в массив
+          uploadedImageFiles.push(file);
+          
+          // Создаем превью из файла
+          const reader = new FileReader();
+          reader.onload = function(e) {
             const imgContainer = Components.el("div", { className: "image-preview-item" });
             const img = Components.el("img", {
               className: "image-preview-img",
               attrs: {
-                src: result.url,
+                src: e.target.result,
                 alt: "Превью"
               }
             });
@@ -833,7 +843,11 @@ async function postFormView(params) {
               variant: "danger",
               size: "sm",
               onClick: function() {
-                uploadedImages = uploadedImages.filter(function(url) { return url !== result.url; });
+                // Удаляем файл из массива
+                const index = uploadedImageFiles.indexOf(file);
+                if (index > -1) {
+                  uploadedImageFiles.splice(index, 1);
+                }
                 imgContainer.remove();
               }
             });
@@ -841,11 +855,8 @@ async function postFormView(params) {
             imgContainer.appendChild(img);
             imgContainer.appendChild(removeBtn);
             imagePreview.appendChild(imgContainer);
-            
-            UI.showToast("Изображение загружено", "success");
-          } catch (err) {
-            console.error("Upload error:", err);
-          }
+          };
+          reader.readAsDataURL(file);
         }
         
         // Remove temporary input
@@ -859,7 +870,7 @@ async function postFormView(params) {
   });
   
   const imagePreview = Components.el("div", { className: "image-preview" });
-  let uploadedImages = [];
+  let uploadedImageFiles = []; // Храним файлы вместо URL-ов
 
   imageSection.appendChild(imageLabel);
   imageSection.appendChild(imageUploadButton);
@@ -896,11 +907,18 @@ async function postFormView(params) {
         streetField.control.value = existing.street || "";
         priceField.control.value = existing.price || "";
         
-        // Load existing images
+        // Load existing images (для отображения)
+        // При редактировании существующие изображения остаются на сервере
+        // Новые файлы будут добавлены к существующим, если replace_images=false
         if (existing.images && Array.isArray(existing.images)) {
-          uploadedImages = existing.images;
-          existing.images.forEach(function(imageUrl) {
-            const imgContainer = Components.el("div", { className: "image-preview-item" });
+          existing.images.forEach(function(imageObj) {
+            // Бекенд возвращает объекты с полем image_url
+            const imageUrl = typeof imageObj === 'string' ? imageObj : (imageObj.image_url || imageObj.url);
+            if (!imageUrl) return;
+            
+            const imgContainer = Components.el("div", { className: "image-preview-item existing-image" });
+            imgContainer.setAttribute('data-image-url', imageUrl);
+            
             const img = Components.el("img", {
               className: "image-preview-img",
               attrs: {
@@ -913,7 +931,8 @@ async function postFormView(params) {
               variant: "danger",
               size: "sm",
               onClick: function() {
-                uploadedImages = uploadedImages.filter(function(url) { return url !== imageUrl; });
+                // При удалении существующего изображения просто скрываем его из превью
+                // В будущем можно добавить функционал удаления отдельных изображений через API
                 imgContainer.remove();
               }
             });
@@ -961,27 +980,30 @@ async function postFormView(params) {
     submitBtn.textContent = isEdit ? "Сохраняем..." : "Публикуем...";
 
     try {
+      // Проверяем количество изображений
+      if (uploadedImageFiles.length > 10) {
+        UI.showToast("Можно загрузить максимум 10 изображений", "error");
+        submitBtn.disabled = false;
+        submitBtn.textContent = isEdit ? "Сохранить изменения" : "Опубликовать";
+        return;
+      }
+
+      const postData = {
+        title: titleValue,
+        content: contentValue,
+        contact: contactValue,
+        city: cityValue || undefined,
+        street: streetValue || undefined,
+        price: priceValue || undefined
+      };
+
       if (isEdit && id) {
-        await Api.updatePost(id, {
-          title: titleValue,
-          content: contentValue,
-          contact: contactValue,
-          city: cityValue,
-          street: streetValue,
-          price: priceValue,
-          images: uploadedImages
-        });
+        // При редактировании: если есть новые файлы, добавляем их к существующим (replace_images=false)
+        await Api.updatePost(id, postData, uploadedImageFiles.length > 0 ? uploadedImageFiles : null, false);
         UI.showToast("Объявление обновлено", "success");
       } else {
-        const created = await Api.createPost({
-          title: titleValue,
-          content: contentValue,
-          contact: contactValue,
-          city: cityValue,
-          street: streetValue,
-          price: priceValue,
-          images: uploadedImages
-        });
+        // При создании: отправляем файлы вместе с данными поста
+        const created = await Api.createPost(postData, uploadedImageFiles.length > 0 ? uploadedImageFiles : null);
         // Если бекенд вернул user_id — запоминаем
         if (created && created.user_id) {
           State.setUserMeta({ userId: created.user_id });

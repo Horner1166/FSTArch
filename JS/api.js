@@ -137,22 +137,107 @@ function getPost(id) {
   });
 }
 
-// Создать новое объявление
-function createPost(payload) {
-  return request(ENDPOINTS.createPost, {
-    method: "POST",
-    body: payload,
-    auth: true
+// Создать новое объявление с поддержкой загрузки изображений
+function createPost(payload, imageFiles = null) {
+  // Всегда используем FormData, так как бекенд ожидает multipart/form-data
+  const formData = new FormData();
+  
+  // Добавляем текстовые поля (обязательные)
+  if (payload.title !== undefined && payload.title !== null) {
+    formData.append('title', payload.title);
+  }
+  if (payload.content !== undefined && payload.content !== null) {
+    formData.append('content', payload.content);
+  }
+  if (payload.contact !== undefined && payload.contact !== null) {
+    formData.append('contact', payload.contact);
+  }
+  // Опциональные поля
+  if (payload.city !== undefined && payload.city) {
+    formData.append('city', payload.city);
+  }
+  if (payload.street !== undefined && payload.street) {
+    formData.append('street', payload.street);
+  }
+  if (payload.price !== undefined && payload.price) {
+    formData.append('price', payload.price);
+  }
+  
+  // Добавляем файлы изображений, если они есть
+  if (imageFiles && imageFiles.length > 0) {
+    for (const file of imageFiles) {
+      formData.append('images', file);
+    }
+  }
+  
+  return fetch(Config.apiBaseUrl + ENDPOINTS.createPost, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + State.getToken()
+    },
+    body: formData
+  }).then(async response => {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const message = errorData.detail || "Ошибка при создании поста";
+      UI.showToast(message, "error");
+      throw new Error(message);
+    }
+    return response.json();
   });
 }
 
-// Обновить объявление
-function updatePost(id, payload) {
+// Обновить объявление с поддержкой загрузки изображений
+function updatePost(id, payload, imageFiles = null, replaceImages = false) {
   const path = `${ENDPOINTS.updatePost}?post_id=${encodeURIComponent(id)}`;
-  return request(path, {
-    method: "PUT",
-    body: payload,
-    auth: true
+  
+  // Всегда используем FormData, так как бекенд ожидает multipart/form-data
+  const formData = new FormData();
+  
+  // Добавляем текстовые поля (только если они переданы)
+  if (payload.title !== undefined && payload.title !== null) {
+    formData.append('title', payload.title);
+  }
+  if (payload.content !== undefined && payload.content !== null) {
+    formData.append('content', payload.content);
+  }
+  if (payload.contact !== undefined && payload.contact !== null) {
+    formData.append('contact', payload.contact);
+  }
+  if (payload.city !== undefined && payload.city !== null) {
+    formData.append('city', payload.city);
+  }
+  if (payload.street !== undefined && payload.street !== null) {
+    formData.append('street', payload.street);
+  }
+  if (payload.price !== undefined && payload.price !== null) {
+    formData.append('price', payload.price);
+  }
+  
+  // Добавляем флаг замены изображений
+  formData.append('replace_images', replaceImages ? 'true' : 'false');
+  
+  // Добавляем файлы изображений, если они есть
+  if (imageFiles && imageFiles.length > 0) {
+    for (const file of imageFiles) {
+      formData.append('images', file);
+    }
+  }
+  
+  return fetch(Config.apiBaseUrl + path, {
+    method: 'PUT',
+    headers: {
+      'Authorization': 'Bearer ' + State.getToken()
+    },
+    body: formData
+  }).then(async response => {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const message = errorData.detail || "Ошибка при обновлении поста";
+      UI.showToast(message, "error");
+      throw new Error(message);
+    }
+    return response.json();
   });
 }
 
