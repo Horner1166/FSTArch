@@ -27,7 +27,8 @@ function initApp() {
         Views.postFormView({ mode: "edit", id: params.id });
       },
       "/contacts": Views.contactsView,
-      "/moderator": Views.moderatorView
+      "/moderator": Views.moderatorView,
+      "/users": Views.usersManagementView
     };
 
     Router.init(routes);

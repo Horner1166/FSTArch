@@ -42,14 +42,59 @@ body {
 body {
   font-family: "Segoe UI", SegoeUI;
   font-weight: 600;
-  background:
-    /* Saturated dark tech gradient */
-    linear-gradient(190deg, #4a2d63 5%, #1f1f3e 25%, #1a2e4a 50%, #0f3a5f 75%, #4a2d63 100%);
+  background: linear-gradient(135deg, #0d0d1a 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #1a1a2e 100%);
+  background-size: 400% 400%;
+  animation: techGradient 20s ease infinite;
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   position: relative;
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  min-height: 100vh;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(ellipse at 20% 20%, rgba(6, 182, 212, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(99, 102, 241, 0.04) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(6, 182, 212, 0.02) 2px,
+      rgba(6, 182, 212, 0.02) 4px
+    );
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes techGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 button,
@@ -66,27 +111,34 @@ select {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
+  gap: 0;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .shell-header,
 .shell-main {
   position: relative;
-  opacity: 0.95;
-  backdrop-filter: blur(12000px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 30px;
-  background: rgba(255, 255, 255, 0);
-  border: 1px solid rgba(255, 255, 255, 0);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(10, 10, 20, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 100%;
 }
 
 .shell-header {
-  padding: 16px 24px 0 24px;
+  padding: 16px 24px;
+  border-radius: 20px 20px 0 0;
+  border-bottom: none;
 }
 
 .shell-main {
-  padding: 16px 24px 24px 24px;
-  max-height: calc(100vh - 80px);
+  padding: 20px 24px 24px 24px;
+  max-height: calc(100vh - 120px);
   overflow-y: auto;
+  border-radius: 0 0 20px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* Плавное появление контента при переходах между страницами */
@@ -115,7 +167,7 @@ select {
     padding: 12px;
   }
   .shell-header {
-    padding: 12px 14px 0 14px;
+    padding: 12px 14px;
   }
   .shell-main {
     padding: 12px 14px 16px 14px;
@@ -131,12 +183,11 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 12px 16px;
-  border-radius: 22px;
-  background:
-    linear-gradient(180deg, rgba(18, 18, 18, 0.96) 0%, rgba(8, 8, 8, 0.98) 100%);
-  border: 1px solid var(--color-border-strong);
-  box-shadow: var(--shadow-soft);
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
   position: relative;
 }
 
@@ -248,6 +299,22 @@ select {
   white-space: nowrap;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+}
+
+.user-pill-clickable {
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.user-pill-clickable:hover {
+  background: rgba(6, 182, 212, 0.2);
+  border-color: rgba(6, 182, 212, 0.4);
+  color: #ffffff;
+}
+
+.user-pill-clickable:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.5);
 }
 
 .user-name {
@@ -1073,6 +1140,117 @@ textarea.input {
   border-top: 1px solid var(--color-border);
 }
 
+/* ============================
+   IMAGE UPLOAD STYLES
+   ============================ */
+
+.image-upload-section {
+  margin: 20px 0;
+}
+
+.image-upload-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--color-text);
+}
+
+.image-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.image-preview-item {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.image-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-preview-item .btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 12px;
+  border-radius: 50%;
+}
+
+/* ============================
+   POST IMAGE DISPLAY STYLES
+   ============================ */
+
+.post-images {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.post-image {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  border: 1px solid var(--color-border);
+}
+
+.post-image:hover {
+  transform: scale(1.05);
+  border-color: var(--color-accent);
+}
+
+.post-images-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  border: 1px solid var(--color-border);
+}
+
+/* Modal images */
+.modal-images {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.modal-image {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  border: 1px solid var(--color-border);
+}
+
+.modal-image:hover {
+  transform: scale(1.05);
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+}
+
 .modal-location-label,
 .modal-price-label {
   font-weight: 600;
@@ -1082,5 +1260,144 @@ textarea.input {
 .modal-location-value,
 .modal-price-value {
   color: var(--color-muted);
+}
+
+/* ============================
+   USER MANAGEMENT STYLES
+   ============================ */
+
+.users-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.user-card {
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: var(--transition-fast);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.user-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(6, 182, 212, 0.55);
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.78);
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.user-card-name {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #e5e7eb;
+}
+
+.user-card-email {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  word-break: break-word;
+}
+
+.user-card-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.user-card-date {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.user-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.badge-admin {
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.badge-moderator {
+  background: rgba(6, 182, 212, 0.2);
+  color: #22d3ee;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.badge-user {
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+@media (max-width: 640px) {
+  .users-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================
+   CONFIRM MODAL STYLES
+   ============================ */
+
+.confirm-modal-overlay {
+  z-index: 100;
+}
+
+.confirm-modal {
+  max-width: 420px;
+  text-align: center;
+}
+
+.confirm-modal-message {
+  margin: 16px 0 24px 0;
+  font-size: 0.95rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.prompt-modal {
+  text-align: left;
+}
+
+.prompt-modal .confirm-modal-message {
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.prompt-modal .form-field {
+  margin-bottom: 0;
+}
+
+.prompt-modal .form-field label {
+  display: none;
 }
 

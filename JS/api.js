@@ -21,7 +21,13 @@ const ENDPOINTS = {
   // Admin moderation endpoints (served under /moderator on backend)
   getPendingPosts: "/moderator/posts/[.get]",
   approvePost: "/moderator/posts/approve/:id/[.post]",
-  rejectPost: "/moderator/posts/reject/:id/[.post]"
+  rejectPost: "/moderator/posts/reject/:id/[.post]",
+  // User management endpoints
+  listUsers: "/moderator/users/[.get]",
+  toggleBanUser: "/moderator/users/:id/[.post]",
+  toggleModeratorRole: "/admin/users/:id/[.post]",
+  // Image upload endpoint
+  uploadImage: "/upload/image/[.post]"
 };
 
 // Универсальный helper для HTTP-запросов
@@ -195,6 +201,53 @@ async function rejectPost(id, reason) {
   });
 }
 
+// Image upload function
+async function uploadImage(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  return fetch(Config.apiBaseUrl + ENDPOINTS.uploadImage, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + State.getToken()
+    },
+    body: formData
+  }).then(async response => {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const message = errorData.detail || "Error uploading image";
+      UI.showToast(message, "error");
+      throw new Error(message);
+    }
+    return response.json();
+  });
+}
+
+// User management functions
+async function listUsers() {
+  const path = ENDPOINTS.listUsers;
+  return request(path, {
+    method: "GET",
+    auth: true
+  });
+}
+
+async function toggleBanUser(userId) {
+  const path = `${ENDPOINTS.toggleBanUser}?user_id=${encodeURIComponent(userId)}`;
+  return request(path, {
+    method: "POST",
+    auth: true
+  });
+}
+
+async function toggleModeratorRole(userId) {
+  const path = `${ENDPOINTS.toggleModeratorRole}?user_id=${encodeURIComponent(userId)}`;
+  return request(path, {
+    method: "POST",
+    auth: true
+  });
+}
+
 export const Api = {
   requestCode,
   authorize,
@@ -209,7 +262,13 @@ export const Api = {
   // Moderator functions
   getPendingPosts,
   approvePost,
-  rejectPost
+  rejectPost,
+  // User management functions
+  listUsers,
+  toggleBanUser,
+  toggleModeratorRole,
+  // Image upload function
+  uploadImage
 };
 
 

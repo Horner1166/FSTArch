@@ -155,13 +155,13 @@ async function homeView() {
         },
         onDelete: async function (p) {
           if (!ensureAuth()) return;
-          if (
-            !window.confirm(
-              "Удалить это объявление без возможности восстановления?"
-            )
-          ) {
-            return;
-          }
+          const confirmed = await Components.confirmModal({
+            title: "Удалить объявление",
+            message: "Удалить это объявление без возможности восстановления?",
+            confirmText: "Удалить",
+            confirmVariant: "danger"
+          });
+          if (!confirmed) return;
           try {
             await Api.deletePost(p.id);
             UI.showToast("Объявление удалено", "success");
@@ -187,6 +187,26 @@ async function homeView() {
       { className: "modal-title" },
       post.title || ""
     );
+
+    // Images section in modal
+    let imagesSection = null;
+    if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+      imagesSection = Components.el("div", { className: "modal-images" });
+      
+      post.images.forEach(function(imageUrl) {
+        const img = Components.el("img", {
+          className: "modal-image",
+          attrs: {
+            src: imageUrl,
+            alt: "Фото объявления"
+          }
+        });
+        img.addEventListener("click", function() {
+          window.open(imageUrl, "_blank");
+        });
+        imagesSection.appendChild(img);
+      });
+    }
 
     const content = Components.el(
       "p",
@@ -217,6 +237,9 @@ async function homeView() {
     });
 
     modal.appendChild(title);
+    if (imagesSection) {
+      modal.appendChild(imagesSection);
+    }
     modal.appendChild(content);
     modal.appendChild(contact);
     modal.appendChild(closeBtn);
@@ -666,7 +689,13 @@ async function dashboardView() {
         Router.navigate("/edit/" + p.id);
       },
       onDelete: async function (p) {
-        if (!confirm("Удалить объявление?")) return;
+        const confirmed = await Components.confirmModal({
+          title: "Удалить объявление",
+          message: "Удалить это объявление без возможности восстановления?",
+          confirmText: "Удалить",
+          confirmVariant: "danger"
+        });
+        if (!confirmed) return;
         try {
           await Api.deletePost(p.id);
           UI.showToast("Объявление удалено", "success");
@@ -759,6 +788,83 @@ async function postFormView(params) {
     type: "text"
   });
 
+  // Image upload section
+  const imageSection = Components.el("div", { className: "image-upload-section" });
+  const imageLabel = Components.el("label", { className: "image-upload-label" }, "Фотографии");
+  
+  // Create upload button
+  const imageUploadButton = Components.button({
+    label: "+ Добавить фото",
+    variant: "secondary",
+    size: "md",
+    onClick: function() {
+      // Create hidden file input when button is clicked
+      const hiddenInput = document.createElement("input");
+      hiddenInput.type = "file";
+      hiddenInput.accept = "image/*";
+      hiddenInput.multiple = true;
+      hiddenInput.style.display = "none";
+      
+      hiddenInput.addEventListener("change", async function(e) {
+        const files = Array.from(e.target.files);
+        
+        for (const file of files) {
+          if (file.size > 5 * 1024 * 1024) {
+            UI.showToast("Файл слишком большой (максимум 5 МБ)", "error");
+            continue;
+          }
+          
+          try {
+            UI.showToast("Загружаем изображение...", "info");
+            const result = await Api.uploadImage(file);
+            uploadedImages.push(result.url);
+            
+            // Add preview
+            const imgContainer = Components.el("div", { className: "image-preview-item" });
+            const img = Components.el("img", {
+              className: "image-preview-img",
+              attrs: {
+                src: result.url,
+                alt: "Превью"
+              }
+            });
+            const removeBtn = Components.button({
+              label: "✕",
+              variant: "danger",
+              size: "sm",
+              onClick: function() {
+                uploadedImages = uploadedImages.filter(function(url) { return url !== result.url; });
+                imgContainer.remove();
+              }
+            });
+            
+            imgContainer.appendChild(img);
+            imgContainer.appendChild(removeBtn);
+            imagePreview.appendChild(imgContainer);
+            
+            UI.showToast("Изображение загружено", "success");
+          } catch (err) {
+            console.error("Upload error:", err);
+          }
+        }
+        
+        // Remove temporary input
+        document.body.removeChild(hiddenInput);
+      });
+      
+      // Add input to body and simulate click
+      document.body.appendChild(hiddenInput);
+      hiddenInput.click();
+    }
+  });
+  
+  const imagePreview = Components.el("div", { className: "image-preview" });
+  let uploadedImages = [];
+
+  imageSection.appendChild(imageLabel);
+  imageSection.appendChild(imageUploadButton);
+  imageSection.appendChild(imagePreview);
+
   const submitBtn = Components.button({
     label: isEdit ? "Сохранить изменения" : "Опубликовать",
     variant: "primary",
@@ -773,6 +879,7 @@ async function postFormView(params) {
   card.appendChild(cityField.wrapper);
   card.appendChild(streetField.wrapper);
   card.appendChild(priceField.wrapper);
+  card.appendChild(imageSection);
   card.appendChild(submitBtn);
 
   main.appendChild(card);
@@ -788,6 +895,35 @@ async function postFormView(params) {
         cityField.control.value = existing.city || "";
         streetField.control.value = existing.street || "";
         priceField.control.value = existing.price || "";
+        
+        // Load existing images
+        if (existing.images && Array.isArray(existing.images)) {
+          uploadedImages = existing.images;
+          existing.images.forEach(function(imageUrl) {
+            const imgContainer = Components.el("div", { className: "image-preview-item" });
+            const img = Components.el("img", {
+              className: "image-preview-img",
+              attrs: {
+                src: imageUrl,
+                alt: "Превью"
+              }
+            });
+            const removeBtn = Components.button({
+              label: "✕",
+              variant: "danger",
+              size: "sm",
+              onClick: function() {
+                uploadedImages = uploadedImages.filter(function(url) { return url !== imageUrl; });
+                imgContainer.remove();
+              }
+            });
+            
+            imgContainer.appendChild(img);
+            imgContainer.appendChild(removeBtn);
+            imagePreview.appendChild(imgContainer);
+          });
+        }
+        
         if (!State.getUser().userId && existing.user_id) {
           State.setUserMeta({ userId: existing.user_id });
         }
@@ -832,7 +968,8 @@ async function postFormView(params) {
           contact: contactValue,
           city: cityValue,
           street: streetValue,
-          price: priceValue
+          price: priceValue,
+          images: uploadedImages
         });
         UI.showToast("Объявление обновлено", "success");
       } else {
@@ -842,7 +979,8 @@ async function postFormView(params) {
           contact: contactValue,
           city: cityValue,
           street: streetValue,
-          price: priceValue
+          price: priceValue,
+          images: uploadedImages
         });
         // Если бекенд вернул user_id — запоминаем
         if (created && created.user_id) {
@@ -931,11 +1069,11 @@ function moderatorView() {
   
   if (!main) return;
   
-  // Проверка прав доступа
-  if (!State.isAdmin()) {
+  // Проверка прав доступа (модератор или админ)
+  if (!State.isAdmin() && !State.isModerator()) {
     const card = Components.el("section", { className: "panel panel-large" }, [
       Components.el("h1", { className: "panel-title" }, "Доступ запрещен"),
-      Components.el("p", { className: "panel-subtitle" }, "У вас нет прав администратора для доступа к этой странице.")
+      Components.el("p", { className: "panel-subtitle" }, "У вас нет прав для доступа к этой странице.")
     ]);
     main.appendChild(card);
     return;
@@ -1091,7 +1229,14 @@ function moderatorView() {
 
   // Функция отклонения объявления (с запросом причины)
   async function rejectPost(postId) {
-    const reason = prompt("Почему объявление отклонено?");
+    const reason = await Components.promptModal({
+      title: "Отклонить объявление",
+      message: "Укажите причину отклонения объявления:",
+      placeholder: "Введите причину...",
+      confirmText: "Отклонить",
+      confirmVariant: "danger",
+      multiline: true
+    });
     if (!reason) return;
     await rejectPostWithReason(postId, reason);
   }
@@ -1140,7 +1285,14 @@ function moderatorView() {
       variant: "danger",
       size: "md",
       onClick: async () => {
-        const reason = prompt("Почему объявление отклонено?");
+        const reason = await Components.promptModal({
+          title: "Отклонить объявление",
+          message: "Укажите причину отклонения объявления:",
+          placeholder: "Введите причину...",
+          confirmText: "Отклонить",
+          confirmVariant: "danger",
+          multiline: true
+        });
         if (reason) {
           await rejectPostWithReason(post.id, reason);
           document.body.removeChild(overlay);
@@ -1184,13 +1336,170 @@ function moderatorView() {
   loadPendingPosts();
 }
 
+// ---------- Страница управления пользователями (для модератора/админа) ----------
+async function usersManagementView() {
+  renderShell();
+  const main = UI.getMainContainer();
+  UI.clearMain();
+  UI.animatePageIn();
+  
+  if (!main) return;
+  
+  // Проверка прав доступа (модератор или админ)
+  if (!State.isAdmin() && !State.isModerator()) {
+    const card = Components.el("section", { className: "panel panel-large" }, [
+      Components.el("h1", { className: "panel-title" }, "Доступ запрещен"),
+      Components.el("p", { className: "panel-subtitle" }, "У вас нет прав для доступа к этой странице.")
+    ]);
+    main.appendChild(card);
+    return;
+  }
+  
+  UI.setPageTitle("Управление пользователями");
+  
+  // Заголовок страницы
+  const header = Components.el("div", { className: "moderator-header" }, [
+    Components.el("h1", { className: "panel-title" }, "Управление пользователями"),
+    Components.el("p", { className: "panel-subtitle" }, "Просматривайте, банте или назначайте модераторами пользователей системы.")
+  ]);
+  
+  // Контейнер для списка пользователей
+  const usersContainer = Components.el("div", { className: "users-grid" });
+  
+  // Функция загрузки и отображения пользователей
+  async function loadUsers() {
+    try {
+      usersContainer.innerHTML = '<div style="text-align: center; padding: 40px;">🔄 Загрузка...</div>';
+      
+      const users = await Api.listUsers();
+      
+      if (!users || users.length === 0) {
+        usersContainer.innerHTML = '<div style="text-align: center; padding: 40px; opacity: 0.7;">Пользователи не найдены</div>';
+        return;
+      }
+      
+      usersContainer.innerHTML = '';
+      
+      users.forEach(user => {
+        const userCard = createUserCard(user);
+        usersContainer.appendChild(userCard);
+      });
+      
+    } catch (error) {
+      console.error('Error loading users:', error);
+      usersContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #ef4444;">Ошибка загрузки пользователей</div>';
+    }
+  }
+  
+  // Создание карточки пользователя
+  function createUserCard(user) {
+    const card = Components.el("article", { className: "user-card" });
+    
+    // Определяем роль для отображения
+    const roleText = user.role === "admin" ? "Администратор" : 
+                     user.role === "moderator" ? "Модератор" : "Пользователь";
+    const roleClass = user.role === "admin" ? "badge-admin" : 
+                      user.role === "moderator" ? "badge-moderator" : "badge-user";
+    
+    const userInfo = Components.el("div", { className: "user-info" }, [
+      Components.el("h3", { className: "user-card-name" }, user.username || "Без имени"),
+      Components.el("p", { className: "user-card-email" }, user.email || ""),
+      Components.el("div", { className: "user-card-meta" }, [
+        Components.el("span", { className: `badge ${roleClass}` }, roleText),
+        user.is_banned ? Components.el("span", { className: "badge badge-danger" }, "Забанен") : null
+      ].filter(Boolean)),
+      Components.el("p", { className: "user-card-date" }, 
+        "Регистрация: " + new Date(user.created_at).toLocaleDateString("ru-RU")
+      )
+    ]);
+    
+    // Кнопки действий
+    const actions = Components.el("div", { className: "user-actions" });
+    
+    // Кнопка бана/разбана (только для обычных пользователей, не для себя)
+    const currentUser = State.getUser();
+    const isOwnAccount = currentUser && currentUser.userId && String(currentUser.userId) === String(user.id);
+    
+    if (user.role === "user" && !isOwnAccount) {
+      const banBtn = Components.button({
+        label: user.is_banned ? "Разбанить" : "Забанить",
+        variant: user.is_banned ? "primary" : "danger",
+        size: "sm",
+        onClick: async () => {
+          const confirmed = await Components.confirmModal({
+            title: user.is_banned ? "Разбанить пользователя" : "Забанить пользователя",
+            message: user.is_banned 
+              ? "Вы уверены, что хотите разбанить пользователя " + user.username + "?" 
+              : "Вы уверены, что хотите забанить пользователя " + user.username + "? Все его объявления будут удалены.",
+            confirmText: user.is_banned ? "Разбанить" : "Забанить",
+            confirmVariant: user.is_banned ? "primary" : "danger"
+          });
+          if (!confirmed) return;
+          try {
+            await Api.toggleBanUser(user.id);
+            UI.showToast(user.is_banned ? "Пользователь разбанен" : "Пользователь забанен", "success");
+            loadUsers();
+          } catch (error) {
+            console.error('Error toggling ban:', error);
+          }
+        }
+      });
+      actions.appendChild(banBtn);
+    }
+    
+    // Кнопка назначения/снятия модератора (только для админа, не для себя и не для других админов)
+    if (State.isAdmin() && !isOwnAccount && user.role !== "admin") {
+      const modBtn = Components.button({
+        label: user.role === "moderator" ? "Снять модератора" : "Сделать модератором",
+        variant: user.role === "moderator" ? "secondary" : "primary",
+        size: "sm",
+        onClick: async () => {
+          const isMod = user.role === "moderator";
+          const confirmed = await Components.confirmModal({
+            title: isMod ? "Снять роль модератора" : "Назначить модератором",
+            message: isMod 
+              ? "Вы уверены, что хотите снять роль модератора у пользователя " + user.username + "?"
+              : "Вы уверены, что хотите назначить пользователя " + user.username + " модератором?",
+            confirmText: isMod ? "Снять роль" : "Назначить",
+            confirmVariant: isMod ? "secondary" : "primary"
+          });
+          if (!confirmed) return;
+          try {
+            await Api.toggleModeratorRole(user.id);
+            UI.showToast(isMod ? "Роль модератора снята" : "Пользователь назначен модератором", "success");
+            loadUsers();
+          } catch (error) {
+            console.error('Error toggling moderator role:', error);
+          }
+        }
+      });
+      actions.appendChild(modBtn);
+    }
+    
+    card.appendChild(userInfo);
+    if (actions.children.length > 0) {
+      card.appendChild(actions);
+    }
+    
+    return card;
+  }
+  
+  // Собираем страницу
+  main.appendChild(header);
+  main.appendChild(usersContainer);
+  
+  // Загружаем пользователей
+  loadUsers();
+}
+
 export const Views = {
   homeView,
   loginView,
   dashboardView,
   postFormView,
   contactsView,
-  moderatorView
+  moderatorView,
+  usersManagementView
 };
 
 

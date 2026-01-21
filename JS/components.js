@@ -142,9 +142,10 @@ function header() {
     { path: "/contacts", label: "Контакты" }
   ];
   
-  // Добавляем пункт админа, если пользователь администратор
-  if (State.isAdmin()) {
+  // Добавляем пункт модерации для модератора или админа
+  if (State.isAdmin() || State.isModerator()) {
     navItems.push({ path: "/moderator", label: "Объявления на модерацию", isModeration: true });
+    navItems.push({ path: "/users", label: "Пользователи" });
   }
   
   navItems.forEach(function (item) {
@@ -168,8 +169,8 @@ function header() {
     nav.appendChild(link);
   });
 
-  // Обновляем счетчик объявлений на модерации (только для админа)
-  if (State.isAdmin()) {
+  // Обновляем счетчик объявлений на модерации (для админа или модератора)
+  if (State.isAdmin() || State.isModerator()) {
     (async function () {
       try {
         const badge = headerEl.querySelector('[data-moderation-badge="1"]');
@@ -196,7 +197,7 @@ function header() {
     // Периодическое обновление, чтобы бейдж появлялся без перезагрузки/перехода
     moderationBadgeTimer = setInterval(async function () {
       try {
-        if (!State.isAdmin()) return;
+        if (!State.isAdmin() && !State.isModerator()) return;
         const badge = headerEl.querySelector('[data-moderation-badge="1"]');
         if (!badge) return;
         const posts = await Api.getPendingPosts();
@@ -217,16 +218,13 @@ function header() {
   const right = el("div", { className: "header-right" });
 
   if (State.isAuthenticated()) {
-    const userLabel = el("div", { className: "user-pill" }, [
+    // Nickname is now clickable and links to the dashboard/profile
+    const userLabelContent = el("span", { className: "nav-link-content" }, [
       el(
         "span",
         { className: "user-name" },
         user.username || user.email || "Пользователь"
-      )
-    ]);
-
-    const dashboardContent = el("span", { className: "nav-link-content" }, [
-      el("span", { className: "nav-link-icon" }, "👤"),
+      ),
       el(
         "span",
         { className: "nav-badge", attrs: { "data-dashboard-badge": "1" } },
@@ -234,18 +232,18 @@ function header() {
       )
     ]);
 
-    const dashboardBtn = el(
+    const userLabel = el(
       "button",
       {
-        className: "btn btn-ghost btn-sm",
+        className: "user-pill user-pill-clickable",
         onClick: function () {
           Router.navigate("/dashboard");
         }
       },
-      dashboardContent
+      [userLabelContent]
     );
 
-    const dashBadge = dashboardBtn.querySelector('[data-dashboard-badge="1"]');
+    const dashBadge = userLabel.querySelector('[data-dashboard-badge="1"]');
     const rejectedCount = user && typeof user.rejectedCount === "number" ? user.rejectedCount : 0;
     if (dashBadge) {
       if (rejectedCount > 0) {
@@ -267,7 +265,6 @@ function header() {
       }
     });
 
-    right.appendChild(dashboardBtn);
     right.appendChild(userLabel);
     right.appendChild(logoutBtn);
   } else {
@@ -317,6 +314,32 @@ function postCard(post, options) {
 
   const title = el("h3", { className: "post-title" }, post.title || "");
   title.style.fontSize = "calc(1.25rem + 4pt)"; // Увеличиваем шрифт на 4пт
+
+  // Add photo display section
+  let imagesSection = null;
+  if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+    imagesSection = el("div", { className: "post-images" });
+    
+    post.images.slice(0, 3).forEach(function(imageUrl) {
+      const img = el("img", {
+        className: "post-image",
+        attrs: {
+          src: imageUrl,
+          alt: "Фото объявления"
+        }
+      });
+      img.addEventListener("click", function(e) {
+        e.stopPropagation();
+        window.open(imageUrl, "_blank");
+      });
+      imagesSection.appendChild(img);
+    });
+    
+    if (post.images.length > 3) {
+      const moreText = el("span", { className: "post-images-more" }, "+" + (post.images.length - 3) + " фото");
+      imagesSection.appendChild(moreText);
+    }
+  }
 
   const text =
     (post.content || "").length > 180
@@ -400,6 +423,9 @@ function postCard(post, options) {
   }
 
   root.appendChild(title);
+  if (imagesSection) {
+    root.appendChild(imagesSection);
+  }
   root.appendChild(content);
   root.appendChild(contact);
   root.appendChild(meta);
@@ -408,12 +434,163 @@ function postCard(post, options) {
   return root;
 }
 
+// Кастомное модальное окно подтверждения
+function confirmModal(options) {
+  const opts = options || {};
+  const title = opts.title || "Подтверждение";
+  const message = opts.message || "Вы уверены?";
+  const confirmText = opts.confirmText || "Да";
+  const cancelText = opts.cancelText || "Отмена";
+  const confirmVariant = opts.confirmVariant || "primary";
+
+  return new Promise(function(resolve) {
+    const overlay = el("div", { className: "modal-overlay confirm-modal-overlay" });
+    const modal = el("div", { className: "modal confirm-modal" });
+
+    const titleEl = el("h2", { className: "modal-title" }, title);
+    const messageEl = el("p", { className: "confirm-modal-message" }, message);
+
+    const actions = el("div", { className: "confirm-modal-actions" });
+
+    const cancelBtn = button({
+      label: cancelText,
+      variant: "secondary",
+      size: "md",
+      onClick: function() {
+        overlay.remove();
+        resolve(false);
+      }
+    });
+
+    const confirmBtn = button({
+      label: confirmText,
+      variant: confirmVariant,
+      size: "md",
+      onClick: function() {
+        overlay.remove();
+        resolve(true);
+      }
+    });
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+
+    modal.appendChild(titleEl);
+    modal.appendChild(messageEl);
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+
+    overlay.addEventListener("click", function(e) {
+      if (e.target === overlay) {
+        overlay.remove();
+        resolve(false);
+      }
+    });
+
+    document.body.appendChild(overlay);
+  });
+}
+
+// Кастомное модальное окно с полем ввода (замена prompt)
+function promptModal(options) {
+  const opts = options || {};
+  const title = opts.title || "Введите значение";
+  const message = opts.message || "";
+  const placeholder = opts.placeholder || "";
+  const confirmText = opts.confirmText || "Подтвердить";
+  const cancelText = opts.cancelText || "Отмена";
+  const confirmVariant = opts.confirmVariant || "primary";
+  const multiline = opts.multiline || false;
+
+  return new Promise(function(resolve) {
+    const overlay = el("div", { className: "modal-overlay confirm-modal-overlay" });
+    const modal = el("div", { className: "modal confirm-modal prompt-modal" });
+
+    const titleEl = el("h2", { className: "modal-title" }, title);
+    
+    let messageEl = null;
+    if (message) {
+      messageEl = el("p", { className: "confirm-modal-message" }, message);
+    }
+
+    const field = inputField({
+      label: "",
+      name: "prompt-input",
+      placeholder: placeholder,
+      multiline: multiline
+    });
+    field.wrapper.style.marginBottom = "20px";
+
+    const actions = el("div", { className: "confirm-modal-actions" });
+
+    const cancelBtn = button({
+      label: cancelText,
+      variant: "secondary",
+      size: "md",
+      onClick: function() {
+        overlay.remove();
+        resolve(null);
+      }
+    });
+
+    const confirmBtn = button({
+      label: confirmText,
+      variant: confirmVariant,
+      size: "md",
+      onClick: function() {
+        const value = (field.control.value || "").trim();
+        overlay.remove();
+        resolve(value || null);
+      }
+    });
+
+    // Подтверждение по Enter (только для однострочного поля)
+    if (!multiline) {
+      field.control.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const value = (field.control.value || "").trim();
+          overlay.remove();
+          resolve(value || null);
+        }
+      });
+    }
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+
+    modal.appendChild(titleEl);
+    if (messageEl) {
+      modal.appendChild(messageEl);
+    }
+    modal.appendChild(field.wrapper);
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+
+    overlay.addEventListener("click", function(e) {
+      if (e.target === overlay) {
+        overlay.remove();
+        resolve(null);
+      }
+    });
+
+    document.body.appendChild(overlay);
+    
+    // Фокус на поле ввода
+    setTimeout(function() {
+      field.control.focus();
+    }, 100);
+  });
+}
+
 export const Components = {
   el,
   button,
   inputField,
   header,
-  postCard
+  postCard,
+  confirmModal,
+  promptModal
 };
 
 
