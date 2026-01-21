@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
+from sqlalchemy import func, desc
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 from typing import List, Optional
 from uuid import UUID
@@ -184,3 +186,25 @@ def get_user_posts(user_id: UUID, current_user: Optional[User] = Depends(get_opt
     for post in posts:
         post.images = session.exec(select(PostImage).where(PostImage.post_id == post.id)).all()
     return posts
+
+@router.get("/search/[.get]", response_model=List[PostResponse])
+def search_posts(
+    query: str = Query(..., min_length=1, max_length=200, description="Строка поиска"),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    session: Session = Depends(get_session)
+):
+    """Полнотекстовый поиск по одобренным постам"""
+    ts_query = func.plainto_tsquery("russian", query).op("||")(func.plainto_tsquery("english", query))
+    stmt = (
+        select(Post)
+        .options(selectinload(Post.images))
+        .where(
+            Post.moderation_status == ModerationStatus.APPROVED,
+            Post.search_vector.op('@@')(ts_query),
+        )
+        .order_by(desc(func.ts_rank_cd(Post.search_vector, ts_query)))
+        .limit(limit)
+        .offset(offset)
+    )
+    return session.exec(stmt).all()

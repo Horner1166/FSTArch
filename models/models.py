@@ -1,5 +1,7 @@
 import uuid
 from typing import Optional, List
+from sqlalchemy import Column, Computed, Index
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
 from enum import Enum
@@ -56,6 +58,27 @@ class Post(SQLModel, table=True):
     moderation_status: ModerationStatus = Field(default=ModerationStatus.PENDING, index=True)
     rejection_reason: Optional[str] = Field(default=None)
     user: Optional["User"] = Relationship(back_populates="posts")
+    search_vector: Optional[str] = Field(
+        default=None,
+        sa_column=Column(
+            TSVECTOR,
+            Computed(
+                "("
+                "to_tsvector('russian', "
+                "coalesce(title, '') || ' ' || coalesce(content, '')"
+                ") || "
+                "to_tsvector('english', "
+                "coalesce(title, '') || ' ' || coalesce(content, '')"
+                ")"
+                ")",
+                persisted=True,
+            ),
+            nullable=True,
+        ),
+    )
+    __table_args__ = (
+        Index("ix_post_search_vector", "search_vector", postgresql_using="gin"),
+    )
     images: List["PostImage"] = Relationship(
         back_populates="post",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}

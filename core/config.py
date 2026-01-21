@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql+psycopg2://ypcgjipgmzqdeixvdvar:kqskklptpdzdbqzeslgwpbjlgyodwa@9qasp5v56q8ckkf5dc.leapcellpool.com:6438/myzecpnpmihdjehpzoas?sslmode=require"
+    DATABASE_URL: str = "postgresql://oqsqwyckhuzieqrndvao:gffdlecgpbdovpddezilfkvrreszkl@9qasp5v56q8ckkf5dc.leapcellpool.com:6438/gfyzzuvotgqnlmyprbax?sslmode=require"
     SECRET_KEY: str = "dev-secret-key"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
