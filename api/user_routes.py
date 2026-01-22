@@ -6,6 +6,7 @@ from sqlmodel import Session, select
 from api.utils import get_current_user
 from models.models import User, Post, PostImage
 from schemas.auth import UpdateUsernameSchema
+from schemas.post import PostResponse
 from db import get_session
 
 router = APIRouter()
@@ -58,7 +59,7 @@ def update_username(data: UpdateUsernameSchema, current_user: User = Depends(get
 
 
 @router.get("/[.get]")
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Получить данные текущего пользователя."""
     now = datetime.now()
 
@@ -68,6 +69,14 @@ def get_me(current_user: User = Depends(get_current_user)):
     else:
         next_username_change_at = None
         can_change_username = True
+
+    # Получаем все посты пользователя
+    stmt = select(Post).where(Post.user_id == current_user.id).order_by(Post.created_at.desc())
+    posts = session.exec(stmt).all()
+    
+    # Загружаем изображения для каждого поста
+    for post in posts:
+        post.images = session.exec(select(PostImage).where(PostImage.post_id == post.id)).all()
 
     return {
         "id": current_user.id,
@@ -79,4 +88,5 @@ def get_me(current_user: User = Depends(get_current_user)):
         "last_username_change_at": current_user.last_username_change_at,
         "next_username_change_at": next_username_change_at,
         "can_change_username": can_change_username,
+        "posts": [PostResponse.model_validate(post) for post in posts],
     }
