@@ -65,7 +65,7 @@ def list_users(current_user: User = Depends(get_current_user), session: Session 
         raise HTTPException(status_code=403, detail="Недостаточно прав доступа")
 
     users = session.exec(select(User)).all()
-    return [{"id": user.id, "username": user.username, "email": user.email, "role": user.role, "created_at": user.created_at} for user in users]
+    return [{"id": user.id, "username": user.username, "email": user.email, "role": user.role, "is_banned": user.is_banned, "created_at": user.created_at} for user in users]
 
 
 @router.post("/users/:id/[.post]")

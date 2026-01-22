@@ -205,8 +205,11 @@ async function homeView() {
             alt: "Фото объявления"
           }
         });
-        // Убираем открытие в новой вкладке - теперь просто превью
-        img.style.cursor = "default";
+        // Добавляем функцию просмотра в увеличенном размере при клике
+        img.style.cursor = "pointer";
+        img.addEventListener("click", function() {
+          Components.openImageModal(post.images, imageUrl);
+        });
         imagesSection.appendChild(img);
       });
     }
@@ -455,19 +458,41 @@ async function dashboardView() {
 
   const user = State.getUser();
 
-  const headerRow = Components.el("div", { className: "dashboard-header" }, [
-    Components.el("div", { className: "dashboard-user" }, [
+  // Проверяем, заблокирован ли пользователь
+  let isBanned = false;
+  if (me && me.is_banned !== undefined) {
+    isBanned = me.is_banned;
+  } else if (user.is_banned !== undefined) {
+    isBanned = user.is_banned;
+  }
+
+  // Добавляем предупреждение для заблокированных пользователей
+  let banWarning = null;
+  if (isBanned) {
+    banWarning = Components.el("section", { className: "panel ban-warning" }, [
       Components.el(
         "p",
-        { className: "dashboard-label" },
-        "Вы вошли как:"
-      ),
-      Components.el(
-        "p",
-        { className: "dashboard-email" },
-        user.email || "unknown@example.com"
+        { className: "ban-warning-text" },
+        "Ваш профиль заблокирован"
       )
-    ]),
+    ]);
+  }
+
+  // Создаём плашки отдельно для размещения в одну колонну
+  const userCard = Components.el("section", { className: "panel" }, [
+    Components.el(
+      "p",
+      { className: "dashboard-label" },
+      "Вы вошли как:"
+    ),
+    Components.el(
+      "p",
+      { className: "dashboard-email" },
+      user.email || "unknown@example.com"
+    )
+  ]);
+
+  const addPostCard = Components.el("section", { className: "panel" }, [
     Components.button({
       label: "Добавить объявление",
       variant: "primary",
@@ -630,7 +655,11 @@ async function dashboardView() {
   postsCard.appendChild(postsInfo);
   postsCard.appendChild(postsList);
 
-  main.appendChild(headerRow);
+  if (banWarning) {
+    main.appendChild(banWarning);
+  }
+  main.appendChild(userCard);
+  main.appendChild(addPostCard);
   main.appendChild(usernameCard);
   main.appendChild(postsCard);
 
@@ -641,8 +670,23 @@ async function dashboardView() {
     
     if (effectiveUserId) {
       // Если мы знаем userId — берём полную выборку по пользователю (включая rejected/pending)
-      posts = await Api.getUserPosts(effectiveUserId);
-      console.log("Dashboard: getUserPosts result =", posts);
+      // Это работает даже для заблокированных пользователей, так как они все еще авторизованы
+      try {
+        posts = await Api.getUserPosts(effectiveUserId);
+        console.log("Dashboard: getUserPosts result =", posts);
+      } catch (err) {
+        console.error("Dashboard error loading posts via getUserPosts:", err);
+        // Если getUserPosts не работает, пробуем fallback
+        try {
+          const all = await Api.getAllPosts();
+          posts = all.filter(function (p) {
+            return p.username && user.username && p.username === user.username;
+          });
+          console.log("Dashboard: fallback filter result =", posts);
+        } catch (fallbackErr) {
+          console.error("Dashboard error in fallback:", fallbackErr);
+        }
+      }
     } else {
       // Иначе фильтруем одобренные объявления по email
       const all = await Api.getAllPosts();
@@ -766,7 +810,25 @@ async function postFormView(params) {
     label: "Описание",
     name: "content",
     placeholder: "Расскажите, что вы предлагаете или ищете...",
-    multiline: true
+    multiline: true,
+    maxlength: 1000
+  });
+  
+  // Добавляем счётчик символов для поля описания
+  const charCounter = Components.el("div", { className: "char-counter" }, "0 / 1000");
+  contentField.wrapper.appendChild(charCounter);
+  
+  // Обновление счётчика при вводе
+  contentField.control.addEventListener("input", function() {
+    const length = this.value.length;
+    charCounter.textContent = length + " / 1000";
+    if (length > 1000) {
+      charCounter.style.color = "#ef4444";
+    } else if (length > 900) {
+      charCounter.style.color = "#f59e0b";
+    } else {
+      charCounter.style.color = "var(--color-muted)";
+    }
   });
   const contactField = Components.inputField({
     label: "Контакты",
@@ -976,6 +1038,11 @@ async function postFormView(params) {
       return;
     }
 
+    if (contentValue.length > 1000) {
+      UI.showToast("Описание не должно превышать 1000 символов", "error");
+      return;
+    }
+
     submitBtn.disabled = true;
     submitBtn.textContent = isEdit ? "Сохраняем..." : "Публикуем...";
 
@@ -1147,6 +1214,36 @@ function moderatorView() {
     const title = Components.el("h3", { className: "post-title" }, post.title || "Без заголовка");
     title.style.fontSize = "calc(1.25rem + 4pt)";
     
+    // Добавляем отображение фотографий
+    let imagesSection = null;
+    if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+      imagesSection = Components.el("div", { className: "post-images" });
+      
+      post.images.slice(0, 3).forEach(function(imageItem) {
+        const imageUrl = typeof imageItem === 'string' ? imageItem : (imageItem.image_url || imageItem.url || '');
+        if (!imageUrl) return;
+        
+        const img = Components.el("img", {
+          className: "post-image",
+          attrs: {
+            src: imageUrl,
+            alt: "Фото объявления"
+          }
+        });
+        img.style.cursor = "pointer";
+        img.addEventListener("click", function(e) {
+          e.stopPropagation();
+          Components.openImageModal(post.images, imageUrl);
+        });
+        imagesSection.appendChild(img);
+      });
+      
+      if (post.images.length > 3) {
+        const moreText = Components.el("span", { className: "post-images-more" }, "+" + (post.images.length - 3) + " фото");
+        imagesSection.appendChild(moreText);
+      }
+    }
+    
     const text = (post.content || "").length > 180
       ? (post.content || "").slice(0, 177) + "..."
       : post.content || "";
@@ -1214,6 +1311,9 @@ function moderatorView() {
     
     // Собираем карточку
     card.appendChild(title);
+    if (imagesSection) {
+      card.appendChild(imagesSection);
+    }
     card.appendChild(content);
     card.appendChild(contactInfo);
     card.appendChild(locationInfo);
@@ -1269,6 +1369,30 @@ function moderatorView() {
     const modal = Components.el("div", { className: "modal modal-moderator" });
     
     const title = Components.el("h2", { className: "modal-title" }, post.title || "Без заголовка");
+    
+    // Добавляем отображение фотографий в модальном окне модератора
+    let imagesSection = null;
+    if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+      imagesSection = Components.el("div", { className: "modal-images" });
+      
+      post.images.forEach(function(imageItem) {
+        const imageUrl = typeof imageItem === 'string' ? imageItem : (imageItem.image_url || imageItem.url || '');
+        if (!imageUrl) return;
+        
+        const img = Components.el("img", {
+          className: "modal-image",
+          attrs: {
+            src: imageUrl,
+            alt: "Фото объявления"
+          }
+        });
+        img.style.cursor = "pointer";
+        img.addEventListener("click", function() {
+          Components.openImageModal(post.images, imageUrl);
+        });
+        imagesSection.appendChild(img);
+      });
+    }
     
     const content = Components.el("div", { className: "modal-content" }, [
       Components.el("p", {}, post.content || "Нет описания")
@@ -1334,6 +1458,9 @@ function moderatorView() {
     actions.appendChild(closeBtn);
     
     modal.appendChild(title);
+    if (imagesSection) {
+      modal.appendChild(imagesSection);
+    }
     modal.appendChild(content);
     modal.appendChild(contact);
     modal.appendChild(location);
@@ -1444,8 +1571,8 @@ async function usersManagementView() {
     
     if (user.role === "user" && !isOwnAccount) {
       const banBtn = Components.button({
-        label: user.is_banned ? "Разбанить" : "Забанить",
-        variant: user.is_banned ? "primary" : "danger",
+        label: user.is_banned ? "Разблокировать" : "Забанить",
+        variant: user.is_banned ? "success" : "danger",
         size: "sm",
         onClick: async () => {
           const confirmed = await Components.confirmModal({

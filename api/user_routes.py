@@ -1,8 +1,10 @@
 from datetime import timedelta, datetime
+from uuid import UUID
+
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from sqlmodel import Session, select
 from api.utils import get_current_user
-from models.models import User, Post
+from models.models import User, Post, PostImage
 from schemas.auth import UpdateUsernameSchema
 from db import get_session
 

@@ -74,13 +74,17 @@ function inputField(options) {
 
   let control;
   if (opts.multiline) {
+    const attrs = {
+      id: id,
+      name: opts.name || "",
+      placeholder: opts.placeholder || ""
+    };
+    if (opts.maxlength) {
+      attrs.maxlength = opts.maxlength;
+    }
     control = el("textarea", {
       className: "input",
-      attrs: {
-        id: id,
-        name: opts.name || "",
-        placeholder: opts.placeholder || ""
-      }
+      attrs: attrs
     });
   } else {
     control = el("input", {
@@ -332,8 +336,12 @@ function postCard(post, options) {
           alt: "Фото объявления"
         }
       });
-      // Убираем открытие в новой вкладке - теперь просто превью
-      img.style.cursor = "default";
+      // Добавляем функцию просмотра в увеличенном размере при клике
+      img.style.cursor = "pointer";
+      img.addEventListener("click", function(e) {
+        e.stopPropagation(); // Предотвращаем открытие модального окна объявления
+        openImageModal(post.images, imageUrl);
+      });
       imagesSection.appendChild(img);
     });
     
@@ -434,6 +442,111 @@ function postCard(post, options) {
   root.appendChild(actions);
 
   return root;
+}
+
+// Функция просмотра изображения в увеличенном размере (как в Авито)
+function openImageModal(allImages, currentImageUrl) {
+  const allImageUrls = allImages.map(function(imageItem) {
+    return typeof imageItem === 'string' ? imageItem : (imageItem.image_url || imageItem.url || '');
+  }).filter(Boolean);
+  
+  let currentIndex = allImageUrls.indexOf(currentImageUrl);
+  if (currentIndex === -1) currentIndex = 0;
+  
+  const overlay = el("div", { className: "image-viewer-overlay" });
+  const viewer = el("div", { className: "image-viewer" });
+  const img = el("img", {
+    className: "image-viewer-img",
+    attrs: {
+      src: allImageUrls[currentIndex],
+      alt: "Просмотр фото"
+    }
+  });
+  
+  const closeBtn = el("button", {
+    className: "image-viewer-close",
+    onClick: function() {
+      overlay.remove();
+    }
+  }, "✕");
+  
+  const prevBtn = el("button", {
+    className: "image-viewer-nav image-viewer-prev",
+    onClick: function() {
+      if (currentIndex > 0) {
+        currentIndex--;
+        img.src = allImageUrls[currentIndex];
+      }
+    }
+  }, "‹");
+  
+  const nextBtn = el("button", {
+    className: "image-viewer-nav image-viewer-next",
+    onClick: function() {
+      if (currentIndex < allImageUrls.length - 1) {
+        currentIndex++;
+        img.src = allImageUrls[currentIndex];
+      }
+    }
+  }, "›");
+  
+  const counter = el("div", { className: "image-viewer-counter" }, 
+    (currentIndex + 1) + " / " + allImageUrls.length
+  );
+  
+  // Обновление счётчика при переключении
+  function updateCounter() {
+    counter.textContent = (currentIndex + 1) + " / " + allImageUrls.length;
+    prevBtn.style.opacity = currentIndex > 0 ? "1" : "0.3";
+    nextBtn.style.opacity = currentIndex < allImageUrls.length - 1 ? "1" : "0.3";
+  }
+  
+  prevBtn.addEventListener("click", updateCounter);
+  nextBtn.addEventListener("click", updateCounter);
+  
+  // Закрытие по клику на overlay
+  overlay.addEventListener("click", function(e) {
+    if (e.target === overlay) {
+      overlay.remove();
+    }
+  });
+  
+  // Закрытие по Escape
+  const handleEscape = function(e) {
+    if (e.key === "Escape") {
+      overlay.remove();
+      document.removeEventListener("keydown", handleEscape);
+    }
+  };
+  document.addEventListener("keydown", handleEscape);
+  
+  // Стрелки влево/вправо для навигации
+  const handleArrowKeys = function(e) {
+    if (e.key === "ArrowLeft" && currentIndex > 0) {
+      currentIndex--;
+      img.src = allImageUrls[currentIndex];
+      updateCounter();
+    } else if (e.key === "ArrowRight" && currentIndex < allImageUrls.length - 1) {
+      currentIndex++;
+      img.src = allImageUrls[currentIndex];
+      updateCounter();
+    }
+  };
+  document.addEventListener("keydown", handleArrowKeys);
+  
+  overlay.addEventListener("click", function() {
+    document.removeEventListener("keydown", handleArrowKeys);
+  });
+  
+  viewer.appendChild(closeBtn);
+  viewer.appendChild(prevBtn);
+  viewer.appendChild(nextBtn);
+  viewer.appendChild(img);
+  viewer.appendChild(counter);
+  overlay.appendChild(viewer);
+  document.body.appendChild(overlay);
+  
+  updateCounter();
 }
 
 // Кастомное модальное окно подтверждения
@@ -592,7 +705,8 @@ export const Components = {
   header,
   postCard,
   confirmModal,
-  promptModal
+  promptModal,
+  openImageModal
 };
 
 
